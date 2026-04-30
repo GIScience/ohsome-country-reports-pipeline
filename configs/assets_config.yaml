@@ -1,0 +1,16 @@
+boundary_asset:
+  api: github # github or geoboundaries
+
+indicators:
+  adm_levels: ['ADM0', 'ADM1']
+
+grids:
+  unit: h3  # square or h3
+  max_workers: 8
+  handle_500_as_na: False
+  h3:
+    zoom_level: Null
+  square:
+    resolution_deg: Null
+
+oqapi-version: v1 #v1 or v1-test

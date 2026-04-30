@@ -1,0 +1,36 @@
+schools:
+- mapping-saturation
+- currentness
+- attribute-completeness
+- user-activity
+roads:
+- mapping-saturation
+- attribute-completeness
+- currentness
+- user-activity
+doctors:
+- mapping-saturation
+- currentness
+- attribute-completeness
+- user-activity
+parks:
+- mapping-saturation
+- currentness
+- attribute-completeness
+- user-activity
+forests:
+- mapping-saturation
+- currentness
+- attribute-completeness
+- user-activity
+clinics:
+- mapping-saturation
+- currentness
+- attribute-completeness
+- user-activity
+land-cover:
+- mapping-saturation
+- currentness
+- land-cover-thematic-accuracy
+- land-cover-completeness
+- user-activity

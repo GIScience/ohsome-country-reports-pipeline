@@ -1,0 +1,157 @@
+relevant_attributes:
+- name
+- operator
+- building-material
+- roof-material
+- height
+- building-levels
+- surface
+- opening-hours
+- emergency
+- speciality
+- phone-number
+- website
+topics:
+  building-count:
+    indicators:
+    - mapping-saturation
+    - currentness
+    - attribute-completeness
+    #- user-activity
+    attributes:
+    - height
+    - house-number
+    - address-street
+    - address-city
+    - address-postcode
+    - address-country
+    - address-state
+    - address-suburb
+    - address-district
+    - building-levels
+    - roof-shape
+    - roof-levels
+    - building-material
+    - roof-material
+    - roof-colour
+    - building-colour
+    - source
+  building-area:
+    indicators:
+    - mapping-saturation
+    - currentness
+    - building-comparison
+    #- user-activity
+  roads-all-highways:
+    indicators:
+    - mapping-saturation
+    - road-comparison
+    - attribute-completeness
+    - currentness
+    #- user-activity
+    attributes:
+    - name
+    - sidewalk
+    - lanes
+    - parking
+    - maxspeed
+    - oneway
+    - surface
+    - lit
+  roads:
+    indicators:
+    - mapping-saturation
+    - attribute-completeness
+    - currentness
+    #- user-activity
+    - roads-thematic-accuracy
+    attributes:
+    - name
+    - sidewalk
+    - crossing
+    - cycleway
+    - cycleway-share-busway
+    - parking
+    - maxspeed
+    - oneway
+    - surface
+    - lit
+  bridges_cars:
+    indicators:
+    - mapping-saturation
+    - currentness
+    #- user-activity
+  bridges_all_ways:
+    indicators:
+    - mapping-saturation
+    - currentness
+    #- user-activity
+  bridges_count:
+    indicators:
+    - mapping-saturation
+    - currentness
+    #- user-activity
+  poi:
+    indicators:
+    - mapping-saturation
+    - currentness
+    #- user-activity
+  schools:
+    indicators:
+    - mapping-saturation
+    - currentness
+    - attribute-completeness
+    #- user-activity
+    attributes:
+    - leisure-playground
+    - name
+    - website
+    - phone-number
+  clinics:
+    indicators:
+    - mapping-saturation
+    - currentness
+    - attribute-completeness
+    #- user-activity
+    attributes:
+    - healthcare-birthing-centre
+    - healthcare-blood-donation
+    - healthcare-rehabilitation
+    - healthcare-vaccination-centre
+    - opening-hours
+    - speciality
+  doctors:
+    indicators:
+    - mapping-saturation
+    - currentness
+    - attribute-completeness
+    #- user-activity
+    attributes:
+    - phone-number
+    - name
+    - speciality
+    - opening-hours
+    - Website
+  hospitals:
+    indicators:
+    - mapping-saturation
+    - currentness
+    - attribute-completeness
+    #- user-activity
+    attributes:
+    - emergency
+    - name
+    - speciality
+    - opening-hours
+  land-cover:
+    indicators:
+    - mapping-saturation
+    - currentness
+    - land-cover-thematic-accuracy
+    - land-cover-completeness
+    #- user-activity
+  healthcare-primary:
+    indicators:
+    - mapping-saturation
+    - currentness
+    #- user-activity

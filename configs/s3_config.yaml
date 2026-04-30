@@ -1,0 +1,6 @@
+endpoint: hot.storage.heigit.org
+bucket: heigit-hdx-public
+access_key: ***REMOVED***
+secret_key: ***REMOVED***
+dest_prefix: oqapi_hdx
+secure: true

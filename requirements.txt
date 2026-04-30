@@ -1,0 +1,19 @@
+dagster==1.10.18                       # core framework
+dagster-webserver==1.10.18             # the newer name for dagit’s webserver
+geopandas==1.1.1
+h3==4.3.1
+minio == 7.2.18
+matplotlib
+contextily
+hdx-python-api
+geojson
+folium
+plotly
+shapely
+pmtiles
+tippecanoe
+pyarrow
+filelock
+pytest
+s3fs
+aiohttp
