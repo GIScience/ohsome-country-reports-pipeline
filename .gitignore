@@ -89,7 +89,8 @@ data/
 *.geojson
 *.tsv
 *.csv
-*.json
+**/data/**/*.json
+!.github/**/*.json
 
 # Python packaging
 *.egg
