@@ -20,6 +20,7 @@ import matplotlib.patches as mpatches
 import shutil
 import gzip
 import s3fs
+import re
 from pathlib import Path
 from statistics import median
 from shapely.geometry import mapping, shape, box, Polygon, MultiPolygon
@@ -32,6 +33,14 @@ from dagster import StaticPartitionsDefinition, MultiPartitionsDefinition, asset
 from scripts.helper_functions import download_from_geoboundaries, download_from_github, upload_to_s3, upload_to_hdx, simplify_geometries, count_vertices, geojson_to_multilayer_pmtiles, upload_stats_to_s3, get_dynamic_resolutions 
 from scripts.smart_request_functions import handle_request_error, build_api_request_jobs, default_target_dir, check_failed_files, generate_curl_command, manage_failed_request_file, ensure_valid_geometry
 from typing import Optional, Any, Tuple, Dict
+
+
+def strip_html_tags(text):
+    """Remove HTML tags from text and return plain text."""
+    if not text or not isinstance(text, str):
+        return text
+    clean = re.compile('<.*?>')
+    return re.sub(clean, '', text)
 
 os.environ["OGR_GEOJSON_MAX_OBJ_SIZE"] = "0"
 
@@ -1085,13 +1094,13 @@ def build_outputs_asset(
                     if p.exists():
                         j = json.load(open(p))
                         adm0_df.at[idx, f"result_value_{ind}_{attr}"] = to_float(j["result"][0]["result"].get("value"))
-                        adm0_df.at[idx, f"description_{ind}_{attr}"] = j["result"][0]["result"].get("description")
+                        adm0_df.at[idx, f"description_{ind}_{attr}"] = strip_html_tags(j["result"][0]["result"].get("description"))
             else:
                 p = adm0_raw / f"{topic}__{ind}__{geom_id}.json"
                 if p.exists():
                     j = json.load(open(p))
                     adm0_df.at[idx, f"result_value_{ind}"] = to_float(j["result"][0]["result"].get("value"))
-                    adm0_df.at[idx, f"description_{ind}"] = j["result"][0]["result"].get("description")
+                    adm0_df.at[idx, f"description_{ind}"] = strip_html_tags(j["result"][0]["result"].get("description"))
 
     # ADM1 dataframe
     # -------------------------
@@ -1108,13 +1117,13 @@ def build_outputs_asset(
                         if p.exists():
                             j = json.load(open(p))
                             adm1_df.at[idx, f"result_value_{ind}_{attr}"] = to_float(j["result"][0]["result"].get("value"))
-                            adm1_df.at[idx, f"description_{ind}_{attr}"] = j["result"][0]["result"].get("description")
+                            adm1_df.at[idx, f"description_{ind}_{attr}"] = strip_html_tags(j["result"][0]["result"].get("description"))
                 else:
                     p = adm1_raw / f"{topic}__{ind}__{geom_id}.json"
                     if p.exists():
                         j = json.load(open(p))
                         adm1_df.at[idx, f"result_value_{ind}"] = to_float(j["result"][0]["result"].get("value"))
-                        adm1_df.at[idx, f"description_{ind}"] = j["result"][0]["result"].get("description")
+                        adm1_df.at[idx, f"description_{ind}"] = strip_html_tags(j["result"][0]["result"].get("description"))
     else:
         adm1_df = gpd.GeoDataFrame(columns=["geometry", "id"])
 
@@ -1163,7 +1172,7 @@ def build_outputs_asset(
                     "indicator": indicator_name,
                     # Fallback to j.get("value") if the nested result is missing
                     "value": to_float(res.get("value") if res else j.get("value")),
-                    "description": res.get("description") if res else j.get("error"),
+                    "description": strip_html_tags(res.get("description") if res else j.get("error")),
                 })
             except Exception:
                 continue
