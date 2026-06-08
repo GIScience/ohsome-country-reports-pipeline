@@ -38,9 +38,9 @@ All configs live in `configs/`. Required files:
 - **`theme_config.yaml`** — Theme definitions: ohsome query keys/values, measure types, OSM history base URLs, and theme expansion mappings (e.g. `school` → `school_isced` + `school_operator`).
 - **`matrix.yaml`** — Maps each topic to its indicators (e.g. `mapping-saturation`, `currentness`) and attributes. Edit this to change which indicators are computed per topic.
 
-### 3. S3 config (optional)
+### 3. S3 config
 
-Required only for S3 uploads. Create `configs/s3_config.yaml`:
+Required for S3 uploads. Create `configs/s3_config.yaml`:
 
 ```yaml
 s3_asset:
@@ -52,9 +52,9 @@ s3_asset:
     secure: true
 ```
 
-### 4. HDX config (optional)
+### 4. HDX config
 
-Required only for HDX uploads. Create `configs/hdx_config.yaml`:
+Required for HDX uploads. Create `configs/hdx_config.yaml`:
 
 ```yaml
 hdx:
