@@ -86,8 +86,8 @@ MWI:
   region: africa
   slug: malawi
 MYS:
-  region: africa
-  slug: malawi
+  region: asia
+  slug: malaysia
 MLI:
   region: africa
   slug: mali
@@ -344,7 +344,8 @@ BLZ:
   region: central-america
   slug: belize
 BRB:
-  slug: central-america
+  region: central-america
+  slug: barbados
 CRI:
   region: central-america
   slug: costa-rica
@@ -373,20 +374,26 @@ NIC:
   region: central-america
   slug: nicaragua
 ATG:
-  slug: central-america
+  region: central-america
+  slug: antigua-and-barbuda
 PAN:
   region: central-america
   slug: panama
 TTO:
-  slug: central-america
+  region: central-america
+  slug: trinidad-and-tobago
 KNA:
-  slug: central-america
+  region: central-america
+  slug: saint-kitts-and-nevis
 LCA:
-  slug: central-america
+  region: central-america
+  slug: saint-lucia
 VCT:
-  slug: central-america
+  region: central-america
+  slug: saint-vincent-and-the-grenadines
 DMA:
-  slug: central-america
+  region: central-america
+  slug: dominica
 ALB:
   region: europe
   slug: albania
@@ -542,7 +549,7 @@ GRL:
   slug: greenland
 GRD:
   region: north-america
-  slug: greenland
+  slug: grenada
 MEX:
   region: north-america
   slug: mexico
