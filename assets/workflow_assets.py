@@ -1,156 +1,59 @@
-import plotly.io as pio
-import plotly.graph_objects as go
-import logging
-import os
-import glob
-import tempfile
-import yaml
-import asyncio
-import aiohttp
+import os, glob, tempfile, yaml, asyncio, aiohttp, json, time, shutil, gzip, s3fs, re
 import numpy as np
 import pandas as pd
 import geopandas as gpd
 import geojson
 import requests
-import json
 import h3
-import time
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-import shutil
-import gzip
-import s3fs
-import re
 from pathlib import Path
-from statistics import median
-from shapely.geometry import mapping, shape, box, Polygon, MultiPolygon
-from shapely.validation import make_valid
-from shapely.ops import unary_union
+from shapely.geometry import mapping, shape, box
 from filelock import FileLock
-import folium
-from folium.features import GeoJson
-from dagster import StaticPartitionsDefinition, MultiPartitionsDefinition, asset, Output, AssetIn, Config
-from scripts.helper_functions import download_from_geoboundaries, download_from_github, upload_to_s3, upload_to_hdx, simplify_geometries, count_vertices, geojson_to_multilayer_pmtiles, upload_stats_to_s3, get_dynamic_resolutions 
-from scripts.smart_request_functions import handle_request_error, build_api_request_jobs, default_target_dir, check_failed_files, generate_curl_command, manage_failed_request_file, ensure_valid_geometry
-from typing import Optional, Any, Tuple, Dict
+from dagster import StaticPartitionsDefinition, MultiPartitionsDefinition, asset, Output, AssetIn
+from scripts.helper_functions import download_from_geoboundaries, download_from_github, upload_to_s3, upload_to_hdx, simplify_geometries, geojson_to_multilayer_pmtiles, upload_stats_to_s3, get_dynamic_resolutions 
+from scripts.smart_request_functions import build_api_request_jobs, default_target_dir, generate_curl_command, manage_failed_request_file, ensure_valid_geometry
+from typing import Optional, Dict
 
 
 def strip_html_tags(text):
-    """Remove HTML tags from text and return plain text."""
     if not text or not isinstance(text, str):
         return text
-    clean = re.compile('<.*?>')
-    return re.sub(clean, '', text)
+    return re.sub('<.*?>', '', text)
 
 os.environ["OGR_GEOJSON_MAX_OBJ_SIZE"] = "0"
 
-ASSET_CONFIG_YAML_PATH = os.path.join(os.getcwd(), "configs", "assets_config.yaml")
-with open(ASSET_CONFIG_YAML_PATH) as _fp:
-    _asset_config = yaml.safe_load(_fp)
+def _load_yaml(name):
+    with open(os.path.join(os.getcwd(), "configs", name)) as f:
+        return yaml.safe_load(f)
 
-COUNTRIES_YAML_PATH = os.path.join(os.getcwd(), "configs", "countries.yaml")
-with open(COUNTRIES_YAML_PATH) as _fp:
-    _mapping = yaml.safe_load(_fp)
-# Use the top‑level keys in the YAML as partition keys
+MATRIX_YAML_PATH = os.path.join(os.getcwd(), "configs", "matrix.yaml")
+
+_asset_config = _load_yaml("assets_config.yaml")
+_mapping = _load_yaml("countries.yaml")
 ALL_COUNTRIES = list(_mapping.keys())
 country_partitions = StaticPartitionsDefinition(partition_keys=ALL_COUNTRIES)
 
-MATRIX_YAML_PATH = os.path.join(os.getcwd(), "configs", "matrix.yaml")
-with open(MATRIX_YAML_PATH) as _fp:
-    _matrix = yaml.safe_load(_fp)
-
+_matrix = _load_yaml("matrix.yaml")
 ALL_TOPICS = list(_matrix.get("topics", {}).keys())
 topics_partitions = StaticPartitionsDefinition(partition_keys=ALL_TOPICS)
 
-s3_CONFIG_YAML_PATH = os.path.join(os.getcwd(), "configs", "s3_config.yaml")
+_s3_config = _load_yaml("s3_config.yaml")
+must_have_topics = _asset_config.get("required_topics", [])
 
-with open(s3_CONFIG_YAML_PATH) as _fp:
-    _s3_config = yaml.safe_load(_fp)
+_theme_config = _load_yaml("theme_config.yaml")
+OSMHISTORY_BASE = _theme_config.get("osmhistory_base", {})
+THEME_CONFIG = _theme_config.get("themes", {})
+THEME_EXPANSION = _theme_config.get("theme_expansion", {})
+key_partitions = StaticPartitionsDefinition(partition_keys=_theme_config.get("partition_keys", []))
 
-OSMHISTORY_BASE = {
-    "count": "https://api.ohsome.org/v1/elements/count",
-    "length": "https://api.ohsome.org/v1/elements/length",
-    "area": "https://api.ohsome.org/v1/elements/area",
-}
-
-THEME_CONFIG = {
-    "building": {
-        "key": "building=* or building",
-        "grouping_key": "building",
-        "values": ["residential","public","commercial","industrial","house","yes","shed"],
-        "measure": "area",
-    },
-    "highway": {
-        "key": "highway=* or highway",
-        "grouping_key": "highway",
-        "values": ["motorway","trunk","primary","secondary","tertiary","unclassified","residential"],
-        "measure": "length",
-    },
-    "school_isced": {
-        "key": "amenity=school or isced:level",
-        "grouping_key": "isced:level",
-        "values": [str(v) for v in ["0","1","2","3","0;1"]],
-        "measure": "count",
-    },
-    "school_operator": {
-        "key": "amenity=school and operator:type=* or amenity=school and operator:type",
-        "grouping_key": "operator:type",
-        "values": ["public","private","government","community","religious","business","university"],
-        "measure": "count",
-    },
-    "hospital_count": {
-        "key": "amenity=hospital or healthcare=hospital",
-        "grouping_key": None, # Signal that this is a total count, not a breakdown
-        "values": [],
-        "measure": "count",
-    },
-    "hospital_speciality": {
-        "key": "(amenity=hospital or healthcare=hospital) and healthcare:speciality=* or (amenity=hospital or healthcare=hospital) and healthcare:speciality",
-        "grouping_key": "healthcare:speciality",
-        "values": ["general","chiropractic","ophthalmology","paediatrics","gynaecology","psychiatry","dentist","internal"],
-        "measure": "count",
-    },
-    "hospital_operator": {
-        "key": "(amenity=hospital or healthcare=hospital) and operator:type=* or (amenity=hospital or healthcare=hospital) and operator:type",
-        "grouping_key": "operator:type",
-        "values": ["public","private","government","community","religious","business","university"],
-        "measure": "count",
-    },
-    "healthcare-primary_count": {
-        "key": "amenity in (clinic, doctors, health_post) or healthcare in (clinic, doctors, doctor, midwife, nurse, center)",
-        "grouping_key": None,
-        "values": [],
-        "measure": "count",
-    },
-    "healthcare-primary_speciality": {
-        "key": "(amenity in (clinic, doctors, health_post) or healthcare in (clinic, doctors, doctor, midwife, nurse, center)) and healthcare:speciality=* or (amenity in (clinic, doctors, health_post) or healthcare in (clinic, doctors, doctor, midwife, nurse, center)) and healthcare:speciality",
-        "grouping_key": "healthcare:speciality",
-        "values": ["general","chiropractic","ophthalmology","paediatrics","gynaecology","psychiatry","dentist","internal"],
-        "measure": "count",
-    },
-    "healthcare-primary_operator": {
-        "key": "(amenity in (clinic, doctors, health_post) or healthcare in (clinic, doctors, doctor, midwife, nurse, center)) and operator:type=* or (amenity in (clinic, doctors, health_post) or healthcare in (clinic, doctors, doctor, midwife, nurse, center)) and operator:type",
-        "grouping_key": "operator:type",
-        "values": ["public","private","government","community","religious","business","university"],
-        "measure": "count",
-    },
-}
-key_partitions = StaticPartitionsDefinition(["highway", "building", "school", "hospital", "healthcare-primary"])
-
-multi_partitions = MultiPartitionsDefinition(
-    {
-        "country": country_partitions,  # assuming defined elsewhere
-        "topic": topics_partitions,
-    }
-)
-
-second_multi_partitions = MultiPartitionsDefinition(
-    {
-        "country": country_partitions,  # assuming defined elsewhere
-        "key": key_partitions,
-
-    }
-)
+multi_partitions = MultiPartitionsDefinition({
+    "country": country_partitions,
+    "topic": topics_partitions,
+})
+second_multi_partitions = MultiPartitionsDefinition({
+    "country": country_partitions,
+    "key": key_partitions,
+})
 
 oqapi_version = _asset_config.get("oqapi-version", "v1")
 
@@ -158,13 +61,6 @@ oqapi_version = _asset_config.get("oqapi-version", "v1")
     partitions_def=country_partitions,
 )
 def boundary_asset(context) -> Output[list[str]]:
-    """
-    Download *all* ADM boundaries for this country (ADM0, ADM1, ADM2…)
-    using either the GeoBoundaries API or GitHub depending on
-    the 'api' value in the assets_config.yaml under boundary_asset.
-    Adds a unique 'id' column to each ADM layer that includes ADM level.
-    """
-
     country = context.partition_key.upper()
     out_dir = os.path.join("data", country)
     os.makedirs(out_dir, exist_ok=True)
@@ -172,341 +68,136 @@ def boundary_asset(context) -> Output[list[str]]:
     api_choice = _asset_config.get("boundary_asset", {}).get("api", [])
     context.log.info(f"[{country}] fetching ADM boundaries using API source: {api_choice}")
 
-    # ---- GEOBOUNDARIES option ----
     if api_choice == "geoboundaries":
         list_url = f"https://www.geoboundaries.org/api/current/gbOpen/{country}/ALL"
         try:
-            download_from_geoboundaries(
-                list_url=list_url,
-                country=country,
-                level_val="boundaryType",
-                url_val="gjDownloadURL",
-                out_dir=out_dir,
-            )
+            download_from_geoboundaries(list_url=list_url, country=country, level_val="boundaryType", url_val="gjDownloadURL", out_dir=out_dir)
         except SystemExit as e:
             context.log.warning(f"[{country}] geoBoundaries download failed: {e}")
             raise Exception(f"Failed to fetch boundaries for {country} from geoBoundaries.")
-
-    # ---- GITHUB option ----
     elif api_choice == "github":
-        list_url = (
-            f"https://api.github.com/repos/wmgeolab/geoBoundaries/contents/"
-            f"releaseData/gbOpen/{country}?ref=main"
-        )
+        list_url = f"https://api.github.com/repos/wmgeolab/geoBoundaries/contents/releaseData/gbOpen/{country}?ref=main"
         try:
-            download_from_github(
-                list_url=list_url,
-                country=country,
-                level_val="name",
-                url_val="git_url",
-                out_dir=out_dir,
-            )
+            download_from_github(list_url=list_url, country=country, level_val="name", url_val="git_url", out_dir=out_dir)
         except SystemExit as e:
             context.log.warning(f"[{country}] GitHub download failed: {e}")
             raise Exception(f"Failed to fetch boundaries for {country} from GitHub.")
-
     else:
-        raise ValueError(
-            f"Invalid API choice '{api_choice}' in assets_config.yaml. "
-            f"Valid options: 'geoboundaries' or 'github'."
-        )
+        raise ValueError(f"Invalid API choice '{api_choice}' in assets_config.yaml. Valid options: 'geoboundaries' or 'github'.")
 
-    # ---- Verify results ----
     pattern = os.path.join(out_dir, "boundary_ADM*.geojson")
     paths = sorted(glob.glob(pattern))
 
     if not paths:
-        raise FileNotFoundError(
-            f"[{country}] No boundary files found at {pattern}. "
-            "Download may have failed."
-        )
+        raise FileNotFoundError(f"[{country}] No boundary files found at {pattern}.")
 
     context.log.info(f"[{country}] Downloaded {len(paths)} boundary files via {api_choice}")
 
-    # ---- Simplify geometries and add unique 'id' with ADM level ----
     updated_paths = []
     for p in paths:
         simplify_geometries(p)
-
-        # Load GeoJSON
         gdf = gpd.read_file(p)
-
-        # Only add 'id' if not already present
         if "id" not in gdf.columns:
-            # Determine ADM level from filename: boundary_ADM0.geojson -> 0
             adm_level = os.path.basename(p).split("_")[1].replace("ADM", "").replace(".geojson", "")
             gdf = gdf.reset_index(drop=True)
-            gdf["id"] = [
-                f"{country}_adm{adm_level}_{str(i+1).zfill(2)}" for i in range(len(gdf))
-            ]
-
-            # Overwrite file with new 'id' column
+            gdf["id"] = [f"{country}_adm{adm_level}_{str(i+1).zfill(2)}" for i in range(len(gdf))]
             gdf.to_file(p, driver="GeoJSON")
-
         updated_paths.append(p)
 
-    return Output(
-        updated_paths,
-        metadata={
-            "paths": updated_paths,
-            "count": len(updated_paths),
-            "source": api_choice,
-        },
-    )
+    return Output(updated_paths, metadata={"paths": updated_paths, "count": len(updated_paths), "source": api_choice})
 
 
-@asset(
-    ins={"boundary_asset": AssetIn()},
-    partitions_def=country_partitions,
-)
+@asset(ins={"boundary_asset": AssetIn()}, partitions_def=country_partitions)
 def h3_hexgrid_asset(context, boundary_asset: list[str]) -> Output[str]:
-    """
-    Create an H3 hexagonal grid over the ADM0 boundary and save as GeoPackage.
-    """
-    
     country = context.partition_key.upper()
     out_dir = os.path.join("data", country)
     os.makedirs(out_dir, exist_ok=True)
 
-    # Find ADM0 boundary
     try:
-        boundary_path = next(
-            p for p in boundary_asset if "ADM0" in os.path.basename(p)
-        )
+        boundary_path = next(p for p in boundary_asset if "ADM0" in os.path.basename(p))
     except StopIteration:
         raise FileNotFoundError(f"[{country}] No ADM0 boundary file found.")
 
     gdf = gpd.read_file(boundary_path).to_crs(4326)
-    
-    # Get config section for grids
     grid_config = _asset_config.get("grids", {})
-    context.log.info(f"[{country}]grid_config:{grid_config}")
     params = get_dynamic_resolutions(gdf, grid_config)
-    
     zoom_level = params["h3"]
-    context.log.info(f"[{country}] Using h3 zoom-level: {zoom_level}")
 
-    bounds = gdf.total_bounds
-    minx, miny, maxx, maxy = bounds
-    buffer_size = 0.05
-    bbox_geom = box(minx - buffer_size, miny - buffer_size, maxx + buffer_size, maxy + buffer_size)
+    minx, miny, maxx, maxy = gdf.total_bounds
+    buf = 0.05
+    bbox_geom = box(minx - buf, miny - buf, maxx + buf, maxy + buf)
 
-    # Generate H3 cells intersecting the bounding box
-    # (For large countries, this can be heavy — consider tiling)
-    bbox_cell_column = h3.geo_to_cells(bbox_geom, res=zoom_level)
-    cell_series = pd.Series(bbox_cell_column)
-    cell_geoms = cell_series.apply(lambda c: h3.cells_to_geo([c]))
-    geoms = cell_geoms.apply(shape)
+    cell_series = pd.Series(h3.geo_to_cells(bbox_geom, res=zoom_level))
+    grid_gdf = gpd.GeoDataFrame(geometry=cell_series.apply(lambda c: shape(h3.cells_to_geo([c]))), crs="EPSG:4326")
+    gdf = gpd.GeoDataFrame(gdf[["shapeName", "shapeISO", "geometry"]], geometry="geometry", crs="EPSG:4326")
+    grid_clipped = gpd.overlay(grid_gdf, gdf, how="intersection").reset_index(drop=True)
 
-    grid_gdf = gpd.GeoDataFrame(geometry=geoms, crs="EPSG:4326")
-
-    gdf = gpd.GeoDataFrame(
-        gdf[["shapeName", "shapeISO", "geometry"]],
-        geometry="geometry",
-        crs="EPSG:4326",
-    )
-
-    # Clip to ADM0
-    grid_clipped = gpd.overlay(grid_gdf, gdf, how="intersection")
-    print(bbox_cell_column)
-
-    # Create simple unique IDs
-    grid_clipped = grid_clipped.reset_index(drop=True)
-
-    grid_clipped["h3_id"] = (
-        f"{country}_hex{zoom_level}_"
-        + (grid_clipped.index + 1).astype(str)
-    )
-    
+    grid_clipped["h3_id"] = f"{country}_hex{zoom_level}_" + (grid_clipped.index + 1).astype(str)
     grid_clipped = grid_clipped[["h3_id", "shapeName", "shapeISO", "geometry"]]
 
     output_path = os.path.join(out_dir, f"{country}_h3_z{zoom_level}.gpkg")
-
-    grid_clipped = grid_clipped.rename(
-        columns={
-            "h3_id": "id",
-            "shapeName": "ADM0_name",
-            "shapeISO": "ADM0_iso",
-            "shapeID": "ADM0_id",
-        }
-    )
-
+    grid_clipped = grid_clipped.rename(columns={"h3_id": "id", "shapeName": "ADM0_name", "shapeISO": "ADM0_iso", "shapeID": "ADM0_id"})
     grid_clipped.to_file(output_path, driver="GPKG")
 
-    context.log.info(f"[{country}] H3 grid saved with {len(grid_clipped)} cells.")
-
-    return Output(
-        output_path,
-        metadata={
-            "country": country,
-            "zoom_level": zoom_level,
-            "cell_count": len(grid_clipped),
-            "output_path": output_path,
-        },
-    )
+    return Output(output_path, metadata={"country": country, "zoom_level": zoom_level, "cell_count": len(grid_clipped), "output_path": output_path})
 
 
-@asset(
-    ins={"boundary_asset": AssetIn()},
-    partitions_def=country_partitions,
-)
+@asset(ins={"boundary_asset": AssetIn()}, partitions_def=country_partitions)
 def square_grid_asset(context, boundary_asset: list[str]) -> Output[str]:
-    """
-    Create a degree-based square grid (e.g., 0.1°) clipped to ADM0 boundary.
-    """
-
     country = context.partition_key.upper()
     out_dir = os.path.join("data", country)
     os.makedirs(out_dir, exist_ok=True)
 
-    # Get ADM0 boundary
     try:
-        boundary_path = next(
-            p for p in boundary_asset if "ADM0" in os.path.basename(p)
-        )
+        boundary_path = next(p for p in boundary_asset if "ADM0" in os.path.basename(p))
     except StopIteration:
         raise FileNotFoundError(f"[{country}] No ADM0 boundary found.")
 
     gdf = gpd.read_file(boundary_path).to_crs(4326)
-    
-    # Get config section for grids
-    grid_config = _asset_config.get("grids", {})
-    params = get_dynamic_resolutions(gdf, grid_config)
-    
+    params = get_dynamic_resolutions(gdf, _asset_config.get("grids", {}))
     res_deg = params["square"]
-    context.log.info(f"[{country}] Using Square Res: {res_deg}°")
+
     minx, miny, maxx, maxy = gdf.total_bounds
+    x0, y0 = np.floor(minx / res_deg) * res_deg, np.floor(miny / res_deg) * res_deg
+    xs, ys = np.arange(x0, maxx + res_deg, res_deg), np.arange(y0, maxy + res_deg, res_deg)
 
-    # Generate global-like grid cells within bounding box
-    x0 = np.floor(minx / res_deg) * res_deg
-    y0 = np.floor(miny / res_deg) * res_deg
-    xs = np.arange(x0, maxx + res_deg, res_deg)
-    ys = np.arange(y0, maxy + res_deg, res_deg)
+    grid_gdf = gpd.GeoDataFrame(geometry=[box(x, y, x + res_deg, y + res_deg) for x in xs for y in ys], crs="EPSG:4326")
+    gdf = gpd.GeoDataFrame(gdf[["shapeName", "shapeISO", "geometry"]], geometry="geometry", crs="EPSG:4326")
+    grid_clipped = gpd.overlay(grid_gdf, gdf, how="intersection").reset_index(drop=True)
 
-    cells = []
-    for x in xs:
-        for y in ys:
-            cells.append(box(x, y, x + res_deg, y + res_deg))
-
-    grid_gdf = gpd.GeoDataFrame(geometry=cells, crs="EPSG:4326")
-
-    
-    gdf = gpd.GeoDataFrame(
-        gdf[["shapeName", "shapeISO", "geometry"]],
-        geometry="geometry",
-        crs="EPSG:4326",
-    )
-    grid_clipped = gpd.overlay(grid_gdf, gdf, how="intersection")
-
-    # Create simple unique IDs
-    grid_clipped = grid_clipped.reset_index(drop=True)
-
-    grid_clipped["cell_id"] = (
-        f"{country}_sqr{res_deg}_"
-        + (grid_clipped.index + 1).astype(str)
-    )
-
+    grid_clipped["cell_id"] = f"{country}_sqr{res_deg}_" + (grid_clipped.index + 1).astype(str)
     grid_clipped = enrich_grid_with_admin_levels(grid_clipped, boundary_asset, country, context)
-    
+
     output_path = os.path.join(out_dir, f"{country}_grid_{res_deg}deg.gpkg")
-
-    grid_clipped = grid_clipped.rename(
-        columns={
-            "cell_id": "id",
-            "shapeName": "ADM0_name",
-            "shapeISO": "ADM0_iso",
-            "shapeID": "ADM0_id",
-        }
-    )
-
+    grid_clipped = grid_clipped.rename(columns={"cell_id": "id", "shapeName": "ADM0_name", "shapeISO": "ADM0_iso", "shapeID": "ADM0_id"})
     grid_clipped.to_file(output_path, driver="GPKG")
 
-    context.log.info(f"[{country}] Square grid saved with {len(grid_clipped)} cells.")
-
-    return Output(
-        output_path,
-        metadata={
-            "country": country,
-            "resolution_deg": res_deg,
-            "cell_count": len(grid_clipped),
-            "output_path": output_path,
-        },
-    )
+    return Output(output_path, metadata={"country": country, "resolution_deg": res_deg, "cell_count": len(grid_clipped), "output_path": output_path})
 
 def enrich_grid_with_admin_levels(grid_gdf, boundary_asset, country, context):
-    """
-    Enrich a grid GeoDataFrame (square or hex) with attributes from ADM1–ADM10 boundaries.
-    Keeps only the boundary with the largest overlap per grid cell.
-
-    Parameters
-    ----------
-    grid_gdf : GeoDataFrame
-        The grid (already clipped to ADM0).
-    boundary_asset : list[str]
-        Paths to boundary files for all ADM levels.
-    country : str
-        ISO country code (for logging).
-    context : dagster op context
-        For logging.
-
-    Returns
-    -------
-    GeoDataFrame
-        Grid with added ADM-level attributes (e.g., ADM1_name, ADM2_id, ...).
-    """
     for adm_path in boundary_asset:
         adm_level = os.path.splitext(os.path.basename(adm_path))[0].split("_")[-1]
         if adm_level == "ADM0":
             continue
 
-        context.log.info(f"[{country}] Enriching grid with {adm_level} attributes")
-
         adm_gdf = gpd.read_file(adm_path).to_crs(4326)[["shapeName", "shapeISO", "shapeID", "geometry"]]
         adm_gdf.columns = ["name", "iso", "id", "geometry"]
 
-        # Spatial intersection to determine largest overlap
         joined = gpd.overlay(grid_gdf, adm_gdf, how="intersection", keep_geom_type=False)
         joined["intersect_area"] = joined.geometry.area
-
         joined_sorted = joined.sort_values("intersect_area", ascending=False).drop_duplicates(subset="cell_id")
 
-        grid_gdf = grid_gdf.merge(
-            joined_sorted[["cell_id", "name", "iso", "id"]],
-            on="cell_id",
-            how="left",
-            suffixes=("", f"_{adm_level}"),
-        )
-
-        grid_gdf = grid_gdf.rename(
-            columns={
-                "name": f"{adm_level}_name",
-                "iso": f"{adm_level}_iso",
-                "id": f"{adm_level}_id",
-            }
-        )
+        grid_gdf = grid_gdf.merge(joined_sorted[["cell_id", "name", "iso", "id"]], on="cell_id", how="left", suffixes=("", f"_{adm_level}"))
+        grid_gdf = grid_gdf.rename(columns={"name": f"{adm_level}_name", "iso": f"{adm_level}_iso", "id": f"{adm_level}_id"})
 
     return grid_gdf
 
 
-class OhsomeConfig(Config):
-    """Dagster config schema for the OHSOME grid indicator asset."""
-    unit_of_analysis: str = "square"   # or "h3"
-    indicator: str = "road-comparison"
-    topic: str = "roads-all-highways"
-    max_workers: int = 10
-
-
 @asset
 def indicators_per_topic_asset(context) -> Output[dict]:
-    """Fetch indicators per topic and available attributes for attribute-completeness."""
-
     yaml_file = "configs/matrix.yaml"
-
-    # Step 1: Load existing YAML
-    with open(yaml_file, "r") as file:
+    with open(yaml_file) as file:
         matrix_data = yaml.safe_load(file)
-
-    # Ensure the structure exists
     if "topics" not in matrix_data:
         matrix_data["topics"] = {}
 
@@ -514,123 +205,77 @@ def indicators_per_topic_asset(context) -> Output[dict]:
     headers = {"accept": "application/json"}
     runtime_info = {}
 
-    # Step 2: Fetch indicators per topic
-    for topic in matrix_data["topics"].keys():
+    for topic in matrix_data["topics"]:
         url = f"{base_url}/metadata/topics/{topic}"
+        for attempt in range(4):
+            try:
+                start = time.time()
+                r = requests.get(url, headers=headers, timeout=120)
+                r.raise_for_status()
+                result = r.json()
+                indicators = result["result"][topic]["indicators"]
+                matrix_data["topics"][topic]["indicators"] = indicators
+                runtime_info[topic] = time.time() - start
+                break
+            except requests.RequestException as e:
+                if attempt < 3:
+                    time.sleep(2)
+                else:
+                    context.log.warning(f"Max retries reached for {topic}: {e}")
 
-        def fetch(index):
-            for attempt in range(4):
-                try:
-                    start_t = time.time()
-                    r = requests.get(url, headers=headers, timeout=120)
-                    r.raise_for_status()
-                    result = r.json()
-                    end_t = time.time()
-                    indicators = result["result"][topic]["indicators"]
-                    matrix_data["topics"][topic]["indicators"] = indicators
-                    runtime_info[topic] = end_t - start_t
-                    return index, indicators, end_t - start_t
-                except requests.RequestException as e:
-                    if attempt < 3:
-                        time.sleep(2)
-                    else:
-                        context.log.warning(f"Max retries reached for {topic}: {e}")
-                        return index, [], None
-
-        _, _, _ = fetch(0)
-
-    # Step 3: Fetch attributes for topics with 'attribute-completeness'
-    attr_url = f"{base_url}/metadata/attributes"
     try:
-        context.log.info("Fetching all attribute metadata...")
-        r = requests.get(attr_url, headers=headers, timeout=120)
+        r = requests.get(f"{base_url}/metadata/attributes", headers=headers, timeout=120)
         r.raise_for_status()
         attr_data = r.json().get("result", {})
     except requests.RequestException as e:
         context.log.warning(f"Failed to fetch attributes metadata: {e}")
         attr_data = {}
 
-    # Step 4: Add attributes for topics that have 'attribute-completeness'
     for topic, data in matrix_data["topics"].items():
-        indicators = data.get("indicators", [])
-        if "attribute-completeness" in indicators and topic in attr_data:
-            # Extract all available attributes for this topic
-            attributes = list(attr_data[topic].keys())
-            matrix_data["topics"][topic]["attributes"] = attributes
+        inds = data.get("indicators", [])
+        if "attribute-completeness" in inds and topic in attr_data:
+            matrix_data["topics"][topic]["attributes"] = list(attr_data[topic].keys())
 
-    # Step 5: Write updated topics back to YAML
     with open(yaml_file, "w") as file:
         yaml.dump(matrix_data, file, sort_keys=False)
 
-    # ----- Create indicator matrix png from yaml -----
-    with open(yaml_file, "r") as f:
-        data = yaml.safe_load(f)
-
-    out_png = "data/indicator_matrix.png"
-
+    data = _load_yaml("matrix.yaml")
     topics = data["topics"]
-
     indicator_counts = {}
+    for td in topics.values():
+        for ind in td.get("indicators", []):
+            indicator_counts[ind] = indicator_counts.get(ind, 0) + 1
 
-    # get and count indicaotrs
-    for topic_data in topics.values():
-        for indicator in topic_data.get("indicators", []):
-            indicator_counts[indicator] = indicator_counts.get(indicator, 0) + 1
-
-    # sort indicators by frequence
-    all_indicators = sorted(indicator_counts.keys(), key=lambda x: indicator_counts[x], reverse=True)
-
-    rows = []
-
-    for topic_name, topic_data in topics.items():
-        row = {"topic": topic_name}
-        indicators = topic_data.get("indicators", [])
-
-        for ind in all_indicators:
-            row[ind] = "X" if ind in indicators else "-"
-
-        rows.append(row)
+    all_indicators = sorted(indicator_counts, key=indicator_counts.get, reverse=True)
+    rows = [{"topic": tn, **{ind: "X" if ind in td.get("indicators", []) else "-" for ind in all_indicators}} for tn, td in topics.items()]
 
     df = pd.DataFrame(rows)
-
-    # save as png
     _, ax = plt.subplots(figsize=(12, 4))
     ax.axis('off')
-
-    table = ax.table(
-        cellText=df.values,
-        colLabels=df.columns,
-        loc='center'
-    )
-
+    table = ax.table(cellText=df.values, colLabels=df.columns, loc='center')
     table.auto_set_font_size(False)
     table.set_fontsize(6)
-
-    # make table nicer with color and bigger text
     for (row, _), cell in table.get_celld().items():
         txt = cell.get_text()
         txt.set_horizontalalignment('center')
         txt.set_weight("bold")
-
         if txt.get_text() == "X":
             txt.set_color("green")
         elif txt.get_text() == "-":
             txt.set_color("red")
-
     table.scale(1.4, 2)
-
-    plt.savefig(out_png, bbox_inches='tight', dpi=200)
+    plt.savefig("data/indicator_matrix.png", bbox_inches='tight', dpi=200)
     plt.close()
 
-    return Output(
-        {
+    return Output({
         "yaml_file": yaml_file,
-        "png_file": out_png,
-        "metadata": {"topics_processed": len(matrix_data["topics"]),
-        "has_attributes": sum(1 for v in matrix_data["topics"].values() if "attributes" in v and v["attributes"]),
-        "runtime_sec_total": sum(runtime_info.values()), },
+        "png_file": "data/indicator_matrix.png",
+        "metadata": {
+            "topics_processed": len(matrix_data["topics"]),
+            "has_attributes": sum(1 for v in matrix_data["topics"].values() if "attributes" in v and v["attributes"]),
+            "runtime_sec_total": sum(runtime_info.values()),
         },
-    )
+    })
 
 @asset(partitions_def=multi_partitions)
 async def ohsome_api_requests_asset(
@@ -643,8 +288,7 @@ async def ohsome_api_requests_asset(
 
     unit = _asset_config.get("grids", {}).get("unit", "h3")
 
-    if unit in ["h3", "square"]:
-        log.info(f"[{country}] UNIT: Using '{unit}' grid cells.")
+    log.info(f"[{country}] UNIT: Using '{unit}' grid cells.")
 
     grid_path = h3_hexgrid_asset if unit == "h3" else square_grid_asset
     max_workers = int(_asset_config.get("grids", {}).get("max_workers", 10))
@@ -984,9 +628,6 @@ def build_outputs_asset(
 
     log.info(f"[{country}] Starting build_outputs asset for topic '{topic}'")
 
-    # -------------------------
-    # Helper
-    # -------------------------
     def to_float(val):
         if val is None:
             return None
@@ -995,11 +636,26 @@ def build_outputs_asset(
         except (TypeError, ValueError):
             return None
 
-    # Grid settings & Raw Path Mapping
-    # -------------------------
+    def _populate_adm_results(adm_df, raw_folder, topic, indicators, relevant):
+        for idx, row in adm_df.iterrows():
+            geom_id = row["id"]
+            for ind in indicators:
+                if ind == "attribute-completeness":
+                    for attr in relevant:
+                        p = raw_folder / f"{topic}__{ind}__{attr}__{geom_id}.json"
+                        if p.exists():
+                            j = json.load(open(p))
+                            adm_df.at[idx, f"result_value_{ind}_{attr}"] = to_float(j["result"][0]["result"].get("value"))
+                            adm_df.at[idx, f"description_{ind}_{attr}"] = strip_html_tags(j["result"][0]["result"].get("description"))
+                else:
+                    p = raw_folder / f"{topic}__{ind}__{geom_id}.json"
+                    if p.exists():
+                        j = json.load(open(p))
+                        adm_df.at[idx, f"result_value_{ind}"] = to_float(j["result"][0]["result"].get("value"))
+                        adm_df.at[idx, f"description_{ind}"] = strip_html_tags(j["result"][0]["result"].get("description"))
+        return adm_df
+
     unit = _asset_config.get("grids", {}).get("unit", "h3")
-    
-    # NEW: Map the grid and the raw folder based on the unit configuration
     if unit == "h3":
         grid_path = h3_hexgrid_asset
         grid_raw = Path(ohsome_api_requests_asset["hex_raw"])
@@ -1007,12 +663,8 @@ def build_outputs_asset(
         grid_path = square_grid_asset
         grid_raw = Path(ohsome_api_requests_asset["sqr_raw"])
 
-    # NEW: Define ADM paths explicitly from the upstream asset dictionary
     adm0_raw = Path(ohsome_api_requests_asset["ADM0_raw"])
     adm1_raw = Path(ohsome_api_requests_asset["ADM1_raw"])
-
-    log.info(f"[{country}] Using '{unit}' grid for building outputs")
-    log.info(f"[{country}] Grid raw responses from: {grid_raw}")
 
     if not os.path.exists(grid_path):
         raise FileNotFoundError(f"Grid file not found: {grid_path}")
@@ -1020,280 +672,156 @@ def build_outputs_asset(
     gdf = gpd.read_file(grid_path)
     log.info(f"[{country}] Loaded grid with {len(gdf)} cells")
 
-    # -------------------------
-    # Load matrix
-    # -------------------------
-    log.info(f"[{country}] Loading indicator matrix: {MATRIX_YAML_PATH}")
-
     with open(MATRIX_YAML_PATH) as f:
         matrix = yaml.safe_load(f)
-
     indicators = matrix["topics"][topic]["indicators"]
     attributes = matrix["topics"][topic].get("attributes", [])
     relevant = [a for a in matrix["relevant_attributes"] if a in attributes]
 
     start = time.time()
-
-    # -------------------------
-    # Populate grid dataframe
-    # -------------------------
-    log.info(f"[{country}] Populating grid result columns")
-
     for ind in indicators:
-            is_attr = (ind == "attribute-completeness")
-            suffixes = relevant if is_attr else [None]
-            
-            for sfx in suffixes:
-                col = f"result_value_{ind}_{sfx}" if sfx else f"result_value_{ind}"
-                gdf[col] = pd.Series([None] * len(gdf), dtype="float64")
-                
-                for idx, row in gdf.iterrows():
-                    geom_id = row["id"]
-                    filename = f"{topic}__{ind}__{sfx}__{geom_id}.json" if sfx else f"{topic}__{ind}__{geom_id}.json"
-                    p = grid_raw / filename
-                    
-                    if p.exists():
-                        with open(p) as f:
-                            j = json.load(f)
-                        
-                        # SAFE EXTRACTION: Check for standard result or "NA" error format
-                        res = j.get("result", [{}])[0].get("result", {})
-                        # If it's a 500-error dummy file, use the top-level 'value' key
-                        val = res.get("value") if res else j.get("value")
-                        
-                        gdf.at[idx, col] = to_float(val)
+        is_attr = (ind == "attribute-completeness")
+        suffixes = relevant if is_attr else [None]
+        for sfx in suffixes:
+            col = f"result_value_{ind}_{sfx}" if sfx else f"result_value_{ind}"
+            gdf[col] = pd.Series([None] * len(gdf), dtype="float64")
+            for idx, row in gdf.iterrows():
+                geom_id = row["id"]
+                filename = f"{topic}__{ind}__{sfx}__{geom_id}.json" if sfx else f"{topic}__{ind}__{geom_id}.json"
+                p = grid_raw / filename
+                if p.exists():
+                    with open(p) as f:
+                        j = json.load(f)
+                    res = j.get("result", [{}])[0].get("result", {})
+                    val = res.get("value") if res else j.get("value")
+                    gdf.at[idx, col] = to_float(val)
 
-    runtime = round(time.time() - start, 1)
-    log.info(f"[{country}] Grid values populated in {runtime}s")
-
-    # -------------------------
-    # Save grid outputs
-    # -------------------------
     out_dir = Path("data") / country / "Output"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     suffix = "h3" if unit == "h3" else "square"
     gpkg = out_dir / f"{country}_{topic}_{suffix}.gpkg"
     csv = out_dir / f"{country}_{topic}_{suffix}.csv"
-
     gdf.to_file(gpkg)
     gdf.drop(columns="geometry").to_csv(csv, index=False)
 
-    # -------------------------
-    # ADM0 dataframe
-    # -------------------------
     adm0_boundary = gpd.read_file(f"data/{country}/boundary_ADM0.geojson").dissolve()
     adm0_df = gpd.GeoDataFrame({"geometry": adm0_boundary.geometry, "id": adm0_boundary.get("id", ["MLI_adm0"]*len(adm0_boundary))})
-    
-    for idx, row in adm0_df.iterrows():
-        geom_id = row["id"]
-        for ind in indicators:
-            if ind == "attribute-completeness":
-                for attr in relevant:
-                    p = adm0_raw / f"{topic}__{ind}__{attr}__{geom_id}.json"
-                    if p.exists():
-                        j = json.load(open(p))
-                        adm0_df.at[idx, f"result_value_{ind}_{attr}"] = to_float(j["result"][0]["result"].get("value"))
-                        adm0_df.at[idx, f"description_{ind}_{attr}"] = strip_html_tags(j["result"][0]["result"].get("description"))
-            else:
-                p = adm0_raw / f"{topic}__{ind}__{geom_id}.json"
-                if p.exists():
-                    j = json.load(open(p))
-                    adm0_df.at[idx, f"result_value_{ind}"] = to_float(j["result"][0]["result"].get("value"))
-                    adm0_df.at[idx, f"description_{ind}"] = strip_html_tags(j["result"][0]["result"].get("description"))
+    adm0_df = _populate_adm_results(adm0_df, adm0_raw, topic, indicators, relevant)
 
-    # ADM1 dataframe
-    # -------------------------
     if os.path.exists(f"data/{country}/boundary_ADM1.geojson"):
         adm1_boundary = gpd.read_file(f"data/{country}/boundary_ADM1.geojson")
         adm1_df = gpd.GeoDataFrame({"geometry": adm1_boundary.geometry, "id": adm1_boundary.get("id", [])})
-        
-        for idx, row in adm1_df.iterrows():
-            geom_id = row["id"]
-            for ind in indicators:
-                if ind == "attribute-completeness":
-                    for attr in relevant:
-                        p = adm1_raw / f"{topic}__{ind}__{attr}__{geom_id}.json"
-                        if p.exists():
-                            j = json.load(open(p))
-                            adm1_df.at[idx, f"result_value_{ind}_{attr}"] = to_float(j["result"][0]["result"].get("value"))
-                            adm1_df.at[idx, f"description_{ind}_{attr}"] = strip_html_tags(j["result"][0]["result"].get("description"))
-                else:
-                    p = adm1_raw / f"{topic}__{ind}__{geom_id}.json"
-                    if p.exists():
-                        j = json.load(open(p))
-                        adm1_df.at[idx, f"result_value_{ind}"] = to_float(j["result"][0]["result"].get("value"))
-                        adm1_df.at[idx, f"description_{ind}"] = strip_html_tags(j["result"][0]["result"].get("description"))
+        adm1_df = _populate_adm_results(adm1_df, adm1_raw, topic, indicators, relevant)
     else:
         adm1_df = gpd.GeoDataFrame(columns=["geometry", "id"])
 
-    # -------------------------
-    # Long-format parquet rows
-    # -------------------------
     long_rows = []
-
-    # 1. Add Grid rows from populated gdf
     for idx, row in gdf.iterrows():
         for ind in indicators:
             if ind == "attribute-completeness":
                 for attr in relevant:
-                    long_rows.append({
-                        "geomID": row["id"], "topic": topic,
-                        "indicator": f"{ind}_{attr}", "value": row[f"result_value_{ind}_{attr}"]
-                    })
+                    long_rows.append({"geomID": row["id"], "topic": topic, "indicator": f"{ind}_{attr}", "value": row[f"result_value_{ind}_{attr}"]})
             else:
-                long_rows.append({
-                    "geomID": row["id"], "topic": topic,
-                    "indicator": ind, "value": row[f"result_value_{ind}"]
-                })
+                long_rows.append({"geomID": row["id"], "topic": topic, "indicator": ind, "value": row[f"result_value_{ind}"]})
 
-    # 2. Add Country-level rows (Scanning ADM0 and ADM1 folders)
     for folder in [adm0_raw, adm1_raw]:
         for file_path in folder.glob(f"{topic}__*.json"):
-            fname = file_path.stem  
+            fname = file_path.stem
             parts = fname.split("__")
             geom_id = parts[-1]
-
-            if "attribute-completeness" in parts[1]:
-                indicator_name = f"{parts[1]}_{parts[2]}"
-            else:
-                indicator_name = parts[1]
-
+            indicator_name = f"{parts[1]}_{parts[2]}" if "attribute-completeness" in parts[1] else parts[1]
             try:
                 with open(file_path) as f:
                     j = json.load(f)
-                
-                # Check for standard response vs dummy NA response
                 res = j.get("result", [{}])[0].get("result", {})
-                
                 long_rows.append({
-                    "geomID": geom_id,
-                    "topic": topic,
-                    "indicator": indicator_name,
-                    # Fallback to j.get("value") if the nested result is missing
+                    "geomID": geom_id, "topic": topic, "indicator": indicator_name,
                     "value": to_float(res.get("value") if res else j.get("value")),
                     "description": strip_html_tags(res.get("description") if res else j.get("error")),
                 })
             except Exception:
                 continue
-    
+
     parquet_path = out_dir / f"{country}_long.parquet"
     new_df = pd.DataFrame(long_rows)
-
     with FileLock(parquet_path.with_suffix(".lock")):
         if parquet_path.exists():
-            old_df = pd.read_parquet(parquet_path)
-            combined = pd.concat([old_df, new_df], ignore_index=True).drop_duplicates(
-                subset=["geomID", "topic", "indicator"], keep="last"
-            )            
+            combined = pd.concat([pd.read_parquet(parquet_path), new_df], ignore_index=True).drop_duplicates(subset=["geomID", "topic", "indicator"], keep="last")
             combined.to_parquet(parquet_path, index=False)
         else:
             new_df.to_parquet(parquet_path, index=False)
 
-    # -------------------------
-    # Collect and gzip individual figures
-    # -------------------------
     figures_dir = out_dir / "figures"
     figures_dir.mkdir(parents=True, exist_ok=True)
-
     figures = {unit: {}, "adm0": {}, "adm1": {}}
     figures[unit][topic] = {}
 
-    # Grid Figures
     for ind in indicators:
         keys = [f"{ind}_{a}" for a in relevant] if ind == "attribute-completeness" else [ind]
         for k in keys:
             figures[unit][topic][k] = []
             for idx, row in gdf.iterrows():
                 geom_id = row["id"]
-                # Adjusting logic to find the file based on indicator type
                 filename = f"{topic}__{ind}__{k.split('_')[-1]}__{geom_id}.json" if ind == "attribute-completeness" else f"{topic}__{ind}__{geom_id}.json"
                 p = grid_raw / filename
                 if p.exists():
                     try:
-                        with open(p) as f:
-                            j = json.load(f)
-                        res = j.get("result", [{}])[0].get("result", {})
-                        fig = res.get("figure") if res else None # 500 errors have no figure
-                        if fig: 
+                        j = json.load(open(p))
+                        fig = j.get("result", [{}])[0].get("result", {}).get("figure") if j.get("result", [{}])[0].get("result", {}) else None
+                        if fig:
                             figures[unit][topic][k].append({"geom_id": geom_id, "figure": fig})
-                    except Exception: continue
+                    except Exception:
+                        continue
 
-    # ADM0/ADM1 Figures
     for folder, g_type in [(adm0_raw, "adm0"), (adm1_raw, "adm1")]:
         for file_path in folder.glob(f"{topic}__*.json"):
             parts = file_path.stem.split("__")
             ind_name = f"{parts[1]}_{parts[2]}" if "attribute-completeness" in parts[1] else parts[1]
-            
-            if g_type not in figures: figures[g_type] = {}
-            if topic not in figures[g_type]: figures[g_type][topic] = {}
-            if ind_name not in figures[g_type][topic]: figures[g_type][topic][ind_name] = []
-
+            figures.setdefault(g_type, {}).setdefault(topic, {}).setdefault(ind_name, [])
             try:
-                j = json.load(open(file_path))
-                fig = j["result"][0]["result"].get("figure")
-                if fig: figures[g_type][topic][ind_name].append({"geom_id": parts[-1], "figure": fig})
-            except Exception: continue
+                fig = json.load(open(file_path))["result"][0]["result"].get("figure")
+                if fig:
+                    figures[g_type][topic][ind_name].append({"geom_id": parts[-1], "figure": fig})
+            except Exception:
+                continue
 
     for g_type, g_topics in figures.items():
         for t_name, t_inds in g_topics.items():
             for i_name, fig_list in t_inds.items():
                 if fig_list:
-                    gz_path = figures_dir / f"{g_type}__{t_name}__{i_name}.json.gz"
-                    with gzip.open(gz_path, "wt", encoding="utf-8") as f:
+                    with gzip.open(figures_dir / f"{g_type}__{t_name}__{i_name}.json.gz", "wt", encoding="utf-8") as f:
                         json.dump(fig_list, f)
 
-# -------------------------
-    # Build PMTiles
-    # -------------------------
     pmtiles_path = out_dir / f"{country}_boundaries.pmtiles"
-    
     if not pmtiles_path.exists():
-        layers = {
-            "ADM0": f"data/{country}/boundary_ADM0.geojson",
-            "ADM1": f"data/{country}/boundary_ADM1.geojson",
-            "square_grid": square_grid_asset,
-            "h3_hexgrid": h3_hexgrid_asset,
-        }
-
+        layers = {"ADM0": f"data/{country}/boundary_ADM0.geojson", "ADM1": f"data/{country}/boundary_ADM1.geojson", "square_grid": square_grid_asset, "h3_hexgrid": h3_hexgrid_asset}
         clean_layers = {}
         tmp_dir = Path(tempfile.mkdtemp(prefix="pmtiles_layers_"))
         for name, path in layers.items():
             if path and os.path.exists(path):
-                tmp_gdf = gpd.read_file(path)
-                if len(tmp_gdf) > 0:
-                    if tmp_gdf.crs and tmp_gdf.crs.to_epsg() != 4326:
-                        tmp_gdf = tmp_gdf.to_crs(4326)
-                    tmp_gdf["geometry"] = tmp_gdf.geometry.buffer(0)
-                    out_path = tmp_dir / f"{name}.geojson"
-                    tmp_gdf.to_file(out_path, driver="GeoJSON")
-                    clean_layers[name] = str(out_path)
-
+                g = gpd.read_file(path)
+                if len(g) > 0:
+                    g = g.to_crs(4326) if (g.crs and g.crs.to_epsg() != 4326) else g
+                    g["geometry"] = g.geometry.buffer(0)
+                    g.to_file(tmp_dir / f"{name}.geojson", driver="GeoJSON")
+                    clean_layers[name] = str(tmp_dir / f"{name}.geojson")
         geojson_to_multilayer_pmtiles(layers=clean_layers, pmtiles_path=str(pmtiles_path))
-    else:
-        log.info(f"[{country}] PMTiles already exists, skipping build")
 
-    # Final Boundary Outputs
-    adm0_gpkg = out_dir / f"{country}_{topic}_ADM0.gpkg"
-    adm0_csv = out_dir / f"{country}_{topic}_ADM0.csv"
+    adm0_gpkg, adm0_csv = out_dir / f"{country}_{topic}_ADM0.gpkg", out_dir / f"{country}_{topic}_ADM0.csv"
     adm0_df.to_file(adm0_gpkg)
     adm0_df.drop(columns="geometry").to_csv(adm0_csv, index=False)
 
-    adm1_gpkg = out_dir / f"{country}_{topic}_ADM1.gpkg"
-    adm1_csv = out_dir / f"{country}_{topic}_ADM1.csv"
+    adm1_gpkg, adm1_csv = out_dir / f"{country}_{topic}_ADM1.gpkg", out_dir / f"{country}_{topic}_ADM1.csv"
     if len(adm1_df) > 0:
         adm1_df.to_file(adm1_gpkg)
         adm1_df.drop(columns="geometry").to_csv(adm1_csv, index=False)
 
     return Output({
-        "grid_gpkg_path": str(gpkg),
-        "grid_csv_path": str(csv),
-        "adm0_gpkg_path": str(adm0_gpkg),
-        "adm0_csv_path": str(adm0_csv),
-        "adm1_gpkg_path": str(adm1_gpkg),
-        "adm1_csv_path": str(adm1_csv),
-        "parquet_path": str(parquet_path),
-        "pmtiles_path": str(pmtiles_path),
+        "grid_gpkg_path": str(gpkg), "grid_csv_path": str(csv),
+        "adm0_gpkg_path": str(adm0_gpkg), "adm0_csv_path": str(adm0_csv),
+        "adm1_gpkg_path": str(adm1_gpkg), "adm1_csv_path": str(adm1_csv),
+        "parquet_path": str(parquet_path), "pmtiles_path": str(pmtiles_path),
         "figures_gzip_path": str(figures_dir),
     })
 
@@ -1306,56 +834,31 @@ def tag_distribution_asset(context) -> Output[dict]:
     log = context.log
     country, theme = context.partition_key.split("|")
 
-    # Theme expansion logic remains the same
-    if theme == "school":
-        themes = ["school_isced", "school_operator"]
-    elif theme == "hospital":
-        themes = ["hospital_speciality", "hospital_operator", "hospital_count"]
-    elif theme == "healthcare-primary":
-        themes = ["healthcare-primary_speciality", "healthcare-primary_operator", "healthcare-primary_count"]
-    else:
-        themes = [theme]
+    themes = THEME_EXPANSION.get(theme, [theme])
 
     boundary_path = f"data/{country}/boundary_ADM0.geojson"
     gdf = gpd.read_file(boundary_path).dissolve()
-
-    # --- FIX: SIMPLIFY GEOMETRY ---
-    # 0.001 is roughly 111 meters. This drastically reduces the string length 
-    # of the GeoJSON and prevents the 413 "Payload Too Large" error.
     simplified_gdf = gdf.simplify(tolerance=0.005, preserve_topology=True)
     geom_json = mapping(simplified_gdf.iloc[0])
-    # ------------------------------
 
     out_dir = Path("data") / country / "Output"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     def call_ohsome(filter_expr, grouping_key, grouping_values, measure):
-        # We send as data=params which is application/x-www-form-urlencoded
-        params = {
-            "bpolys": json.dumps({
-                "type": "FeatureCollection",
-                "features": [{"type": "Feature", "geometry": geom_json}]
-            }),
-            "filter": filter_expr,
-            "time": "2026-01-01",
-        }
-
+        params = {"bpolys": json.dumps({"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": geom_json}]}), "filter": filter_expr, "time": "2026-01-01"}
         url = OSMHISTORY_BASE[measure]
         if grouping_key:
             url = f"{url.rstrip('/')}/groupBy/tag"
             params["groupByKey"] = grouping_key
             if grouping_values:
                 params["groupByValues"] = grouping_values
-        
-        log.info(f"[{country}] Calling OHSOME: {url} | Payload size: {len(str(params))} chars")
-        
         try:
-            r = requests.post(url, data=params, timeout=600) # Increased timeout for large regions
+            r = requests.post(url, data=params, timeout=600)
             r.raise_for_status()
             return r.json()
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 413:
-                log.error(f"Payload still too large for {country}. Try increasing simplification tolerance.")
+                log.error(f"Payload still too large for {country}.")
             raise e
 
     def sum_groupby(resp):
@@ -1410,160 +913,66 @@ def tag_distribution_asset(context) -> Output[dict]:
 
         results.append(str(out_file))
 
-    return Output(
-        {"files": results, "country": country, "theme": theme},
-        metadata={
-            "country": country,
-            "theme": theme,
-            "files_written": len(results),
-        },
-    )
+    return Output({"files": results, "country": country, "theme": theme}, metadata={"country": country, "theme": theme, "files_written": len(results)})
 
 
-@asset(
-    deps=["build_outputs_asset"],
-    partitions_def=multi_partitions,
-)
+@asset(deps=["build_outputs_asset"], partitions_def=multi_partitions)
 def upload_s3_asset(context, build_outputs_asset):
-    """Uploads outputs returned by build_outputs_asset to S3."""
-
     country, _ = context.partition_key.split("|")
-    output_paths = build_outputs_asset  # dict returned by build_outputs_asset
-
-    upload_to_s3(country=country, paths=output_paths, context=context.log)
-
-    context.log.info(f"[{country}] Uploaded dataset(s) to S3 successfully.")
+    upload_to_s3(country=country, paths=build_outputs_asset, context=context.log)
 
 
-@asset(
-    deps=["tag_distribution_asset"],
-    partitions_def=second_multi_partitions,
-)
+@asset(deps=["tag_distribution_asset"], partitions_def=second_multi_partitions)
 def upload_stats_s3_asset(context, tag_distribution_asset):
-    """
-    Uploads OSM tag distribution (.json.gz) to S3 under
-    oqapi_hdx/osm_stats/{COUNTRY}/
-    """
-
     log = context.log
     country, theme = context.partition_key.split("|")
-
     file_paths = tag_distribution_asset["files"]
     if isinstance(file_paths, str):
-        file_paths = [file_paths]  # wrap single file in a list
-
-    for file_path in file_paths:
-        if not os.path.exists(file_path):
-            raise FileNotFoundError(file_path)
-
-        log.info(f"[{country}] Uploading OSM stats ({theme}) → S3: {file_path}")
-
-        upload_stats_to_s3(
-            country=country,
-            file_path=file_path,
-            log=log,
-        )
-
-        log.info(f"[{country}] OSM stats uploaded successfully: {file_path}")
+        file_paths = [file_paths]
+    for fp in file_paths:
+        if not os.path.exists(fp):
+            raise FileNotFoundError(fp)
+        upload_stats_to_s3(country=country, file_path=fp, log=log)
 
 
-@asset(
-    deps=['upload_s3_asset'],
-    partitions_def=country_partitions,
-)
+@asset(deps=['upload_s3_asset'], partitions_def=country_partitions)
 def upload_hdx_asset(context):
     country = context.partition_key.upper()
-
-    hdx_config_path = "configs/hdx_config.yaml"
-    countries_config = "configs/countries.yaml"
-
-    context.log.info(f"[{country}] Uploading dataset to HDX")
-
-    hdx_country_datasets, links = upload_to_hdx(country, hdx_config_path, countries_config, context)
-
-    context.log.info(f"[{country}] Upload to HDX complete: {hdx_country_datasets}")
+    hdx_country_datasets, links = upload_to_hdx(country, "configs/hdx_config.yaml", "configs/countries.yaml", context)
     return hdx_country_datasets, links
 
 
-@asset(
-    deps=["upload_hdx_asset",
-          "upload_s3_asset",
-          "ohsome_api_requests_asset",
-          "build_outputs_asset"],
-    partitions_def=country_partitions,
-)
+@asset(deps=["upload_hdx_asset", "upload_s3_asset", "ohsome_api_requests_asset", "build_outputs_asset"], partitions_def=country_partitions)
 def verify_and_delete_asset(context):
-    """
-    Check that uploaded datasets are accessible on HDX.
-    Only deletes dataset if all necessary topics are present and accessible.
-    """
-
     country = context.partition_key.upper()
-
-    # Get all files which are listed on RustFS of each country using s3fs
     endpoint = f"https://{_s3_config['endpoint']}"
-
-    fs = s3fs.S3FileSystem(
-        anon=True,
-        client_kwargs={'endpoint_url': endpoint})
+    fs = s3fs.S3FileSystem(anon=True, client_kwargs={'endpoint_url': endpoint})
     path_for_s3 = f"{_s3_config['bucket']}/{_s3_config['dest_prefix']}/downloads/{country.upper()}"
-    
-    context.log.info(f"[{country}] Checking HDX files on {endpoint}/{path_for_s3}")
     files = fs.ls(path_for_s3)
-
-    # necessary topics for cleanup
-    must_have_topics = ["roads-all-highways",
-                        "building-count",
-                        "schools",
-                        "hospitals",
-                        "healthcare-primary"]
-
     local_folder = f"data/{country}"
-
-    # give server some time to register all files
     time.sleep(5)
 
-    failed_links = []
-    existing_topics = []
-
+    failed_links, existing_topics = [], []
     for file_path in files:
         fname = os.path.basename(file_path)
         try:
-            # check if file exists without downloading it
             r = requests.head(f"{endpoint}/{file_path}", timeout=30)
             if r.status_code in [200, 301, 302]:
-                context.log.info(f"[{country}] HDX file accessible: {fname}")
-                # extract topic name from file name
-                topic = fname.rsplit(".", 1)[0].split("_",)[1]
+                topic = fname.rsplit(".", 1)[0].split("_")[1]
                 if topic not in existing_topics:
-                    existing_topics.append(str(topic))
+                    existing_topics.append(topic)
             else:
-                context.log.warning(f"[{country}] HDX file returned {r.status_code}: {fname}")
-                context.log.info(f"[{country}] HDX URL: {file_path}")
                 failed_links.append((fname, f"HTTP {r.status_code}"))
         except Exception as e:
-            context.log.error(f"[{country}] Error accessing HDX file {fname}: {e}")
             failed_links.append((fname, str(e)))
 
-    # make sure all necessary topics are present before cleanup
-    if not all(topic in existing_topics for topic in must_have_topics):
-        context.log.error(f"[{country}] Not all required topics are present on HDX. Existing topics: {existing_topics}"
-                          f"Required topics: {must_have_topics}")
+    if not all(t in existing_topics for t in must_have_topics):
         raise Exception(f"HDX verification failed: Missing required topics. Found: {existing_topics}")
-    else:
-        context.log.info(f"[{country}] All required topics are present on HDX: {existing_topics}")
 
-    # delete local files if all links work
     if not failed_links:
-        context.log.info(f"All datasets for [{country}] are accessible on HDX.")
         if os.path.exists(local_folder):
             shutil.rmtree(local_folder)
-            context.log.info(f"[{country.upper()}] All local files deleted.")
         else:
-            context.log.warning(f"[{country.upper()}] Cleanup-Path {local_folder} not found.")
             raise FileNotFoundError(f"Cleanup failed: {local_folder} not found.")
     else:
-        # if links failed, keep files and raise error
-        context.log.error(f"[{country.upper()}] Cleanup failed!"
-                          f"The following links are not accessible: {failed_links}")
         raise Exception(f"Cleanup failed for {failed_links}")

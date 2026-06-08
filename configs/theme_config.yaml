@@ -1,0 +1,132 @@
+partition_keys:
+  - highway
+  - building
+  - school
+  - hospital
+  - healthcare-primary
+
+osmhistory_base:
+  count: "https://api.ohsome.org/v1/elements/count"
+  length: "https://api.ohsome.org/v1/elements/length"
+  area: "https://api.ohsome.org/v1/elements/area"
+
+theme_expansion:
+  school:
+    - school_isced
+    - school_operator
+  hospital:
+    - hospital_speciality
+    - hospital_operator
+    - hospital_count
+  healthcare-primary:
+    - healthcare-primary_speciality
+    - healthcare-primary_operator
+    - healthcare-primary_count
+
+themes:
+  building:
+    key: "building=* or building"
+    grouping_key: "building"
+    values:
+      - residential
+      - public
+      - commercial
+      - industrial
+      - house
+      - "yes"
+      - shed
+    measure: area
+  highway:
+    key: "highway=* or highway"
+    grouping_key: "highway"
+    values:
+      - motorway
+      - trunk
+      - primary
+      - secondary
+      - tertiary
+      - unclassified
+      - residential
+    measure: length
+  school_isced:
+    key: "amenity=school or isced:level"
+    grouping_key: "isced:level"
+    values:
+      - "0"
+      - "1"
+      - "2"
+      - "3"
+      - "0;1"
+    measure: count
+  school_operator:
+    key: "amenity=school and operator:type=* or amenity=school and operator:type"
+    grouping_key: "operator:type"
+    values:
+      - public
+      - private
+      - government
+      - community
+      - religious
+      - business
+      - university
+    measure: count
+  hospital_count:
+    key: "amenity=hospital or healthcare=hospital"
+    grouping_key: null
+    values: []
+    measure: count
+  hospital_speciality:
+    key: "(amenity=hospital or healthcare=hospital) and healthcare:speciality=* or (amenity=hospital or healthcare=hospital) and healthcare:speciality"
+    grouping_key: "healthcare:speciality"
+    values:
+      - general
+      - chiropractic
+      - ophthalmology
+      - paediatrics
+      - gynaecology
+      - psychiatry
+      - dentist
+      - internal
+    measure: count
+  hospital_operator:
+    key: "(amenity=hospital or healthcare=hospital) and operator:type=* or (amenity=hospital or healthcare=hospital) and operator:type"
+    grouping_key: "operator:type"
+    values:
+      - public
+      - private
+      - government
+      - community
+      - religious
+      - business
+      - university
+    measure: count
+  healthcare-primary_count:
+    key: "amenity in (clinic, doctors, health_post) or healthcare in (clinic, doctors, doctor, midwife, nurse, center)"
+    grouping_key: null
+    values: []
+    measure: count
+  healthcare-primary_speciality:
+    key: "(amenity in (clinic, doctors, health_post) or healthcare in (clinic, doctors, doctor, midwife, nurse, center)) and healthcare:speciality=* or (amenity in (clinic, doctors, health_post) or healthcare in (clinic, doctors, doctor, midwife, nurse, center)) and healthcare:speciality"
+    grouping_key: "healthcare:speciality"
+    values:
+      - general
+      - chiropractic
+      - ophthalmology
+      - paediatrics
+      - gynaecology
+      - psychiatry
+      - dentist
+      - internal
+    measure: count
+  healthcare-primary_operator:
+    key: "(amenity in (clinic, doctors, health_post) or healthcare in (clinic, doctors, doctor, midwife, nurse, center)) and operator:type=* or (amenity in (clinic, doctors, health_post) or healthcare in (clinic, doctors, doctor, midwife, nurse, center)) and operator:type"
+    grouping_key: "operator:type"
+    values:
+      - public
+      - private
+      - government
+      - community
+      - religious
+      - business
+      - university
+    measure: count

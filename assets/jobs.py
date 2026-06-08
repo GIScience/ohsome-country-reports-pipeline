@@ -28,3 +28,12 @@ boundaries_job = define_asset_job(
         "square_grid_asset",
     ),
 )
+
+# Job that publishes assets to HDX and cleans up
+publish_job = define_asset_job(
+    name="publish_job",
+    selection=AssetSelection.assets(
+        "upload_hdx_asset",
+        "verify_and_delete_asset",
+    ),
+)

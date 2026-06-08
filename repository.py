@@ -14,7 +14,7 @@ from assets.workflow_assets import (
     verify_and_delete_asset,
 )
 
-from assets.jobs import osm_quality_job, osm_history_job, boundaries_job
+from assets.jobs import osm_quality_job, osm_history_job, boundaries_job, publish_job
 
 
 defs = Definitions(
@@ -33,5 +33,6 @@ defs = Definitions(
     ],
     jobs=[osm_quality_job,
           osm_history_job,
-          boundaries_job],
+          boundaries_job,
+          publish_job],
 )
