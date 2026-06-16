@@ -1,0 +1,52 @@
+[project]
+name = "refactored-pipeline"
+version = "0.0.1"
+description = "Dagster Essentials"
+readme = "README.md"
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "dagster==1.12.4",
+    "dagster-dg-cli",
+    "dagster-webserver",
+    "requests>=2.32.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff",
+    "pytest",
+]
+
+[dependency-groups]
+dev = [
+    "ruff",
+    "pytest",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/refactored_pipeline"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.dg]
+directory_type = "project"
+
+[tool.dg.project]
+root_module = "refactored_pipeline"
+registry_modules = [
+    "refactored_pipeline.defs.*",
+]
+
+[tool.ruff.lint]
+ignore = [
+    "ERA001", # comments are fine for a learning environment
+    "E501",   # Line too long for docstrings
+    "F401",   # unused imports already caught by pylance
+]
+
+fixable = ["ALL"]
+unfixable = [
+    "F401", # dont remove unused imports
+]

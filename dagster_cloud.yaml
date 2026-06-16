@@ -1,0 +1,4 @@
+locations:
+  - location_name: refactored_pipeline
+    code_source:
+      package_name: refactored_pipeline
