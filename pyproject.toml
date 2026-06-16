@@ -1,7 +1,7 @@
 [project]
-name = "refactored-pipeline"
+name = "osm_quality_pipeline"
 version = "0.0.1"
-description = "Dagster Essentials"
+description = "osm_quality_pipeline"
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
 dependencies = [
@@ -24,7 +24,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/refactored_pipeline"]
+packages = ["src/osm_quality_pipeline"]
 
 [build-system]
 requires = ["hatchling"]
@@ -34,9 +34,9 @@ build-backend = "hatchling.build"
 directory_type = "project"
 
 [tool.dg.project]
-root_module = "refactored_pipeline"
+root_module = "osm_quality_pipeline"
 registry_modules = [
-    "refactored_pipeline.defs.*",
+    "osm_quality_pipeline.defs.*",
 ]
 
 [tool.ruff.lint]

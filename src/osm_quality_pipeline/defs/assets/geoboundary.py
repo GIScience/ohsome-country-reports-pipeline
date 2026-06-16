@@ -1,7 +1,7 @@
 import os
 import dagster as dg
-from refactored_pipeline.defs.assets.utils import download_from_geoboundaries
-from refactored_pipeline.defs.partitions import country_partitions
+from src.osm_quality_pipeline.defs.assets.utils import download_from_geoboundaries
+from src.osm_quality_pipeline.defs.partitions import country_partitions
 
 
 @dg.asset(
