@@ -7,7 +7,7 @@ from src.osm_quality_pipeline.defs.partitions import country_partitions
 @dg.asset(
     partitions_def=country_partitions,
 )
-def geoboundary_asset(context) -> dg.Output[str]:
+def geoboundary_geojson(context) -> dg.Output[str]:
     country = context.partition_key.upper()
     out_dir = os.path.join("data", country)
     os.makedirs(out_dir, exist_ok=True)
