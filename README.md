@@ -31,10 +31,7 @@ Using dg to scaffold your project will ensure that files are placed in the corre
 ```sh
 dg check defs
 ```
-```
-All component YAML validated successfully.
-All definitions loaded successfully.
-```
+
 Use the command line to run the following command in the root of your Dagster project to start the pipeline.
 ```sh
 dg dev
