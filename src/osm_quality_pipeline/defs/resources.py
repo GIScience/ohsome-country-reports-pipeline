@@ -1,4 +1,5 @@
 import yaml
+import requests
 from importlib.resources import files
 import dagster as dg
 
@@ -9,3 +10,12 @@ class CountryConfig(dg.ConfigurableResource):
             files("osm_quality_pipeline.configs").joinpath("countries.yaml").read_text()
         )
         return data.get(iso3.upper(), {})
+
+
+class OhsomeQualityApiResource(dg.ConfigurableResource):
+    base_url: str = "https://api.quality.ohsome.org/v1"
+
+    def get_topics(self) -> list[str]:
+        resp = requests.get(f"{self.base_url}/metadata/topics")
+        resp.raise_for_status()
+        return list(resp.json()["result"].keys())

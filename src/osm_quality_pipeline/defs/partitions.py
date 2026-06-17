@@ -7,3 +7,10 @@ _countries = yaml.safe_load(
 )
 ALL_COUNTRIES = list(_countries.keys())
 country_partitions = dg.StaticPartitionsDefinition(partition_keys=ALL_COUNTRIES)
+
+topics_partitions = dg.DynamicPartitionsDefinition(name="topics")
+
+multi_partitions = dg.MultiPartitionsDefinition({
+    "country": country_partitions,
+    "topic": topics_partitions,
+})
