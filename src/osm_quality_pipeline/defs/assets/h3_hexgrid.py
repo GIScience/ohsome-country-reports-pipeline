@@ -2,9 +2,9 @@ import os
 import dagster as dg
 import pandas as pd
 import geopandas as gpd
-from src.osm_quality_pipeline.defs.partitions import country_partitions
-from src.osm_quality_pipeline.defs.assets import constants
-from src.osm_quality_pipeline.defs.assets import geoboundary
+from osm_quality_pipeline.defs.partitions import country_partitions
+from osm_quality_pipeline.defs.assets import constants
+from osm_quality_pipeline.defs.assets import geoboundary
 import h3
 from shapely.geometry import shape, box
 
