@@ -17,11 +17,19 @@ def h3_hexgrid_asset(context, geoboundary_geojson: dg.Output[str]) -> dg.Output[
 
     try:
         boundary_path = next(os.path.join(geoboundary_geojson, f) for f in os.listdir(geoboundary_geojson)if "ADM0" in f)
-    except StopIteration: # TODO: does this except still work with the new logic in the try block?
+    except StopIteration:
         raise FileNotFoundError(f"[{country}] No ADM0 boundary file found.")
 
     gdf = gpd.read_file(boundary_path).to_crs(4326)
-    params = get_dynamic_resolutions(gdf) # TODO: put things after this in separate function to make testing easier and code more readable
+    grid_clipped, zoom_level = create_h3_gdf(gdf=gdf, country=country)
+
+    output_path = os.path.join(out_dir, f"{country}_h3_z{zoom_level}.gpkg")
+    grid_clipped.to_file(output_path, driver="GPKG")
+    return dg.Output(output_path, metadata={"country": country, "zoom_level": zoom_level, "cell_count": len(grid_clipped), "output_path": output_path})
+
+
+def create_h3_gdf(gdf, country):
+    params = get_dynamic_resolutions(gdf)
     zoom_level = params["h3"]
 
     minx, miny, maxx, maxy = gdf.total_bounds
@@ -35,12 +43,10 @@ def h3_hexgrid_asset(context, geoboundary_geojson: dg.Output[str]) -> dg.Output[
 
     grid_clipped["h3_id"] = f"{country}_hex{zoom_level}_" + (grid_clipped.index + 1).astype(str)
     grid_clipped = grid_clipped[["h3_id", "shapeName", "shapeISO", "geometry"]]
+    grid_clipped = grid_clipped.rename(
+        columns={"h3_id": "id", "shapeName": "ADM0_name", "shapeISO": "ADM0_iso", "shapeID": "ADM0_id"})
 
-    output_path = os.path.join(out_dir, f"{country}_h3_z{zoom_level}.gpkg")
-    grid_clipped = grid_clipped.rename(columns={"h3_id": "id", "shapeName": "ADM0_name", "shapeISO": "ADM0_iso", "shapeID": "ADM0_id"})
-    grid_clipped.to_file(output_path, driver="GPKG")
-
-    return dg.Output(output_path, metadata={"country": country, "zoom_level": zoom_level, "cell_count": len(grid_clipped), "output_path": output_path})
+    return grid_clipped, zoom_level
 
 
 def get_dynamic_resolutions(gdf):
