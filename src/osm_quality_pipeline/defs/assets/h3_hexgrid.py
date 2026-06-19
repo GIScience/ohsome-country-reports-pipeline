@@ -10,7 +10,7 @@ from shapely.geometry import shape, box
 
 
 @dg.asset(ins={"geoboundary_geojson": dg.AssetIn()}, partitions_def=country_partitions) # TODO: maybe change this to deps instead of ins
-def h3_hexgrid_asset(context, geoboundary_geojson: dg.Output[str]) -> dg.Output[str]:
+def h3_hexgrid(context, geoboundary_geojson: dg.Output[str]) -> dg.Output[str]:
     country = context.partition_key.upper()
     out_dir = os.path.join("data", country)
     os.makedirs(out_dir, exist_ok=True)
