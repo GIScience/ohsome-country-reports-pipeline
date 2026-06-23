@@ -10,7 +10,7 @@ country_partitions = dg.StaticPartitionsDefinition(partition_keys=ALL_COUNTRIES)
 
 topics_partitions = dg.DynamicPartitionsDefinition(name="topics")
 
-multi_partitions = dg.MultiPartitionsDefinition({
+multi_partitions_oqapi_request = dg.MultiPartitionsDefinition({
     "country": country_partitions,
     "topic": topics_partitions,
 })
