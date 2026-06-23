@@ -48,6 +48,9 @@ def oqapi_api_requests(
             },
         }
 
+        if indicator == "attribute-completeness":
+            params["attributes"] = ["name"]# TODO: figure out how to pass attribute completeness as optional partition
+
         headers = {"Accept": "application/json", "Content-Type": "application/json"}
         url = f"{ohsome_api.base_url}/indicators/{indicator}"
         resp = requests.post(url, json=params, headers=headers, timeout=120)
@@ -67,3 +70,4 @@ def oqapi_api_requests(
             "cells_processed": success,
         },
     )
+# TODO: how to get all possible partition combinations?
