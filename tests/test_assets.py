@@ -1,6 +1,8 @@
 from src.osm_quality_pipeline.defs.assets import h3_hexgrid
 from src.osm_quality_pipeline.defs.assets import oqapi_requests
 from osm_quality_pipeline.defs.resources import OhsomeQualityApiResource
+import shutil
+from pathlib import Path
 import geopandas as gpd
 import dagster as dg
 import json
@@ -21,18 +23,23 @@ def test_hexgrid_asset():
     )
     gdf = gpd.read_file(result.value)
     assert len(gdf) == 15
-    # shutil.rmtree(Path(result.value).parent)
+    shutil.rmtree(Path(result.value).parent)
 
 
 def test_oqapi_request():
-    context = dg.build_asset_context(partition_key="tmp")
-    boundary_path = "../tests/data/TMP/TMP_h3_z6.gpkg"
+    context = dg.build_asset_context(partition_key=dg.MultiPartitionKey(
+    {
+        "country": "TMP",
+        "topic": "roads-all-highways|mapping-saturation",
+    }))
+
+    boundary_path = "../tests/data/TMP_h3_z6.gpkg"
     result = oqapi_requests.oqapi_api_requests(
         context=context,
         h3_hexgrid=str(boundary_path),
         ohsome_api=OhsomeQualityApiResource(),
     )
-
-    with open("../tests/data/TMP/raw_responses_roads-all-highways/hex/roads-all-highways__mapping-saturation__TMP_hex6_3.json") as f:
+    with open(result.value["raw_dir"] + "/roads-all-highways__mapping-saturation__TMP_hex6_3.json") as f:
         data = json.load(f)
     assert data["result"][0]["result"]["value"] == pytest.approx(1.0)
+    shutil.rmtree(Path(result.value["raw_dir"]).parent.parent)

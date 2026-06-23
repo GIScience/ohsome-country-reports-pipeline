@@ -8,15 +8,11 @@ import requests
 from osm_quality_pipeline.defs.constants import ApiRequestConfig
 from osm_quality_pipeline.defs.partitions import country_partitions
 from osm_quality_pipeline.defs.resources import OhsomeQualityApiResource
-
-
-TOPIC = "roads-all-highways"
-INDICATOR = "mapping-saturation"
-
+from osm_quality_pipeline.defs.partitions import multi_partitions_oqapi_request
 
 @dg.asset(
     ins={"h3_hexgrid": dg.AssetIn()},
-    partitions_def=country_partitions,
+    partitions_def=multi_partitions_oqapi_request,
 )
 def oqapi_api_requests(
     context: dg.AssetExecutionContext,
@@ -24,11 +20,14 @@ def oqapi_api_requests(
     ohsome_api: OhsomeQualityApiResource,
     config: ApiRequestConfig,
 ):
-    country = context.partition_key.upper()
+    keys = context.partition_key.keys_by_dimension
+
+    country = keys["country"]
+    topic, indicator = keys["topic"].split("|")
 
     gdf = gpd.read_file(h3_hexgrid)
 
-    raw_dir = Path("data") / country / f"raw_responses_{TOPIC}" / "hex"
+    raw_dir = Path("data") / country / f"raw_responses_{topic}" / "hex"
     raw_dir.mkdir(parents=True, exist_ok=True)
 
     success = 0
@@ -36,7 +35,7 @@ def oqapi_api_requests(
     for _, row in gdf.iterrows():
         geom_id = row["id"]
         params = {
-            "topic": TOPIC,
+            "topic": topic,
             "bpolys": {
                 "type": "FeatureCollection",
                 "features": [
@@ -50,11 +49,11 @@ def oqapi_api_requests(
         }
 
         headers = {"Accept": "application/json", "Content-Type": "application/json"}
-        url = f"{ohsome_api.base_url}/indicators/{INDICATOR}"
+        url = f"{ohsome_api.base_url}/indicators/{indicator}"
         resp = requests.post(url, json=params, headers=headers, timeout=120)
         resp.raise_for_status()
 
-        out_path = raw_dir / f"{TOPIC}__{INDICATOR}__{geom_id}.json"
+        out_path = raw_dir / f"{topic}__{indicator}__{geom_id}.json"
         with open(out_path, "w") as f:
             json.dump(resp.json(), f)
         success += 1
@@ -63,8 +62,8 @@ def oqapi_api_requests(
         {"raw_dir": str(raw_dir)},
         metadata={
             "country": country,
-            "topic": TOPIC,
-            "indicator": INDICATOR,
+            "topic": topic,
+            "indicator": indicator,
             "cells_processed": success,
         },
     )
