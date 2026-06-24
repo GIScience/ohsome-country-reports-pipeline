@@ -11,7 +11,7 @@ from osm_quality_pipeline.defs.resources import OhsomeQualityApiResource
 from osm_quality_pipeline.defs.partitions import multi_partitions_oqapi_request
 
 @dg.asset(
-    ins={"h3_hexgrid": dg.AssetIn()},
+    deps=["h3_hexgrid"],
     partitions_def=multi_partitions_oqapi_request,
 )
 def oqapi_api_requests(
