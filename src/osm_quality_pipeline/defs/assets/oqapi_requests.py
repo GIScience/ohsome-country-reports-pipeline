@@ -72,4 +72,126 @@ def responses_user_activity(
         },
     )
 
+
+@dg.asset(
+    deps=["h3_hexgrid"],
+    partitions_def=multi_partitions_oqapi_request,
+)
+def responses_roads_thematic_accuracy(
+    context: dg.AssetExecutionContext,
+    h3_hexgrid: str,
+    config: ApiRequestConfig,
+):
+    INDICATOR = "roads-thematic-accuracy"
+    keys = context.partition_key.keys_by_dimension
+    country = keys["country"]
+    topic = keys["topic"]
+
+    raw_dir = Path("data") / country / f"raw_responses_{topic}" / "hex"
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    gdf = gpd.read_file(h3_hexgrid)
+
+    success = oqapi_requests(gdf=gdf, topic=topic, indicator=INDICATOR, raw_dir=raw_dir)
+
+    return dg.Output(
+        {"raw_dir": str(raw_dir)},
+        metadata={
+            "country": country,
+            "topic": topic,
+            "indicator": INDICATOR,
+            "cells_processed": success,
+        },
+    )
+
+@dg.asset(
+    deps=["h3_hexgrid"],
+    partitions_def=multi_partitions_oqapi_request,
+)
+def responses_building_comparison(
+    context: dg.AssetExecutionContext,
+    h3_hexgrid: str,
+    config: ApiRequestConfig,
+):
+    INDICATOR = "building-comparison"
+    keys = context.partition_key.keys_by_dimension
+    country = keys["country"]
+    topic = keys["topic"]
+
+    raw_dir = Path("data") / country / f"raw_responses_{topic}" / "hex"
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    gdf = gpd.read_file(h3_hexgrid)
+
+    success = oqapi_requests(gdf=gdf, topic=topic, indicator=INDICATOR, raw_dir=raw_dir)
+
+    return dg.Output(
+        {"raw_dir": str(raw_dir)},
+        metadata={
+            "country": country,
+            "topic": topic,
+            "indicator": INDICATOR,
+            "cells_processed": success,
+        },
+    )
+
+
+@dg.asset(
+    deps=["h3_hexgrid"],
+    partitions_def=multi_partitions_oqapi_request,
+)
+def responses_land_cover_completeness(
+    context: dg.AssetExecutionContext,
+    h3_hexgrid: str,
+    config: ApiRequestConfig,
+):
+    INDICATOR = "land-cover-completeness"
+    keys = context.partition_key.keys_by_dimension
+    country = keys["country"]
+    topic = keys["topic"]
+
+    raw_dir = Path("data") / country / f"raw_responses_{topic}" / "hex"
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    gdf = gpd.read_file(h3_hexgrid)
+
+    success = oqapi_requests(gdf=gdf, topic=topic, indicator=INDICATOR, raw_dir=raw_dir)
+
+    return dg.Output(
+        {"raw_dir": str(raw_dir)},
+        metadata={
+            "country": country,
+            "topic": topic,
+            "indicator": INDICATOR,
+            "cells_processed": success,
+        },
+    )
+
+
+@dg.asset(
+    deps=["h3_hexgrid"],
+    partitions_def=multi_partitions_oqapi_request,
+)
+def responses_land_cover_thematic_accuracy(
+    context: dg.AssetExecutionContext,
+    h3_hexgrid: str,
+    config: ApiRequestConfig,
+):
+    INDICATOR = "land-cover-thematic-accuracy"
+    keys = context.partition_key.keys_by_dimension
+    country = keys["country"]
+    topic = keys["topic"]
+
+    raw_dir = Path("data") / country / f"raw_responses_{topic}" / "hex"
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    gdf = gpd.read_file(h3_hexgrid)
+
+    success = oqapi_requests(gdf=gdf, topic=topic, indicator=INDICATOR, raw_dir=raw_dir)
+
+    return dg.Output(
+        {"raw_dir": str(raw_dir)},
+        metadata={
+            "country": country,
+            "topic": topic,
+            "indicator": INDICATOR,
+            "cells_processed": success,
+        },
+    )
 # TODO: how to do attribute completeness?
