@@ -9,6 +9,7 @@ REQUIRED_TOPICS = [
     "schools",
     "hospitals",
     "healthcare-primary",
+    "land-cover",
 ]
 
 ADM_LEVELS = ["ADM0", "ADM1"]

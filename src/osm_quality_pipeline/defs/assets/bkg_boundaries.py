@@ -4,7 +4,7 @@ import requests
 import sys
 import zipfile
 import geopandas as gpd
-from src.osm_quality_pipeline.defs.constants import DATA_DIR
+from osm_quality_pipeline.defs.constants import DATA_DIR
 
 
 @dg.asset
