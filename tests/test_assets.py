@@ -45,20 +45,37 @@ def test_oqapi_request():
     shutil.rmtree(Path(result.value["raw_dir"]).parent.parent)
 
 
-def test_oqapi_request_attribute_completeness():
+def test_oqapi_request_mapping_saturation():
     context = dg.build_asset_context(partition_key=dg.MultiPartitionKey(
     {
         "country": "TMP",
-        "topic": "roads-all-highways|attribute-completeness",
+        "topic": "roads-all-highways",
     }))
 
     boundary_path = "../tests/data/TMP_h3_z6.gpkg"
-    result = oqapi_requests.oqapi_api_requests(
+    result = oqapi_requests.responses_mapping_saturation(
         context=context,
         h3_hexgrid=str(boundary_path),
-        ohsome_api=OhsomeQualityApiResource(),
     )
-    with open(result.value["raw_dir"] + "/roads-all-highways__attribute-completeness__TMP_hex6_3.json") as f:
+    with open(result.value["raw_dir"] + "/roads-all-highways__mapping-saturation__TMP_hex6_3.json") as f:
         data = json.load(f)
-    assert data["result"][0]["result"]["value"] == pytest.approx(0.0)
+    assert data["result"][0]["result"]["value"] == pytest.approx(1.0)
+    shutil.rmtree(Path(result.value["raw_dir"]).parent.parent)
+
+
+def test_oqapi_request_user_activity():
+    context = dg.build_asset_context(partition_key=dg.MultiPartitionKey(
+    {
+        "country": "TMP",
+        "topic": "roads-all-highways",
+    }))
+
+    boundary_path = "../tests/data/TMP_h3_z6.gpkg"
+    result = oqapi_requests.responses_user_activity(
+        context=context,
+        h3_hexgrid=str(boundary_path),
+    )
+    with open(result.value["raw_dir"] + "/roads-all-highways__user-activity__TMP_hex6_3.json") as f:
+        data = json.load(f)
+    assert data["result"][0]["result"]["value"] == pytest.approx(1.0)
     shutil.rmtree(Path(result.value["raw_dir"]).parent.parent)

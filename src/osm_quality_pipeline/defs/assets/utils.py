@@ -4,6 +4,9 @@ import io
 import sys
 import zipfile
 import geopandas as gpd
+from osm_quality_pipeline.defs.resources import OhsomeQualityApiResource
+import json
+
 
 def download_from_geoboundaries(list_url, country, level_val, url_val, out_dir):
     print(f"Fetching available levels from {list_url}")
@@ -51,7 +54,7 @@ def download_from_geoboundaries(list_url, country, level_val, url_val, out_dir):
         print("All available boundaries downloaded successfully.")
 
 
-def download_bkg_boundaries(list_url, level_val, out_dir):   #layer: vg25_sta, vg25_lan, vg25_gem
+def download_bkg_boundaries(list_url, level_val, out_dir):  #layer: vg25_sta, vg25_lan, vg25_gem
     try:
         resp = requests.get(list_url)
         resp.raise_for_status()
@@ -68,7 +71,6 @@ def download_bkg_boundaries(list_url, level_val, out_dir):   #layer: vg25_sta, v
         with open(gpkg_path, "wb") as target:
             target.write(source.read())
 
-
     out_path = os.path.join(out_dir, f"{level_val}.geojson")
 
     gdf = (
@@ -78,3 +80,39 @@ def download_bkg_boundaries(list_url, level_val, out_dir):   #layer: vg25_sta, v
 
     gdf = gdf[gdf.geometry.notnull() & gdf.is_valid]
     gdf.to_file(out_path, driver="GeoJSON")
+
+
+def oqapi_requests(gdf, topic, indicator, raw_dir):
+    success = 0
+
+    for _, row in gdf.iterrows():
+        geom_id = row["id"]
+        params = {
+            "topic": topic,
+            "bpolys": {
+                "type": "FeatureCollection",
+                "features": [
+                    {
+                        "type": "Feature",
+                        "geometry": row.geometry.__geo_interface__,
+                        "properties": {},
+                    }
+                ],
+            },
+        }
+
+        if indicator == "attribute-completeness":
+            params["attributes"] = ["name"]  # TODO: figure out how to pass attribute completeness as optional partition
+
+        ApiResource = OhsomeQualityApiResource()
+        headers = {"Accept": "application/json", "Content-Type": "application/json"}
+        url = f"{ApiResource.base_url}/indicators/{indicator}"
+        resp = requests.post(url, json=params, headers=headers, timeout=120)
+        resp.raise_for_status()
+
+        out_path = raw_dir / f"{topic}__{indicator}__{geom_id}.json"
+        with open(out_path, "w") as f:
+            json.dump(resp.json(), f)
+        success += 1
+
+        return success

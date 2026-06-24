@@ -6,68 +6,70 @@ import geopandas as gpd
 import requests
 
 from osm_quality_pipeline.defs.constants import ApiRequestConfig
-from osm_quality_pipeline.defs.partitions import country_partitions
 from osm_quality_pipeline.defs.resources import OhsomeQualityApiResource
 from osm_quality_pipeline.defs.partitions import multi_partitions_oqapi_request
+from osm_quality_pipeline.defs.assets.utils import oqapi_requests
+
 
 @dg.asset(
     deps=["h3_hexgrid"],
     partitions_def=multi_partitions_oqapi_request,
 )
-def oqapi_api_requests(
+def responses_mapping_saturation(
     context: dg.AssetExecutionContext,
     h3_hexgrid: str,
-    ohsome_api: OhsomeQualityApiResource,
     config: ApiRequestConfig,
 ):
+    INDICATOR = "mapping-saturation"
     keys = context.partition_key.keys_by_dimension
-
     country = keys["country"]
-    topic, indicator = keys["topic"].split("|")
-
-    gdf = gpd.read_file(h3_hexgrid)
+    topic = keys["topic"]
 
     raw_dir = Path("data") / country / f"raw_responses_{topic}" / "hex"
     raw_dir.mkdir(parents=True, exist_ok=True)
+    gdf = gpd.read_file(h3_hexgrid)
 
-    success = 0
-
-    for _, row in gdf.iterrows():
-        geom_id = row["id"]
-        params = {
-            "topic": topic,
-            "bpolys": {
-                "type": "FeatureCollection",
-                "features": [
-                    {
-                        "type": "Feature",
-                        "geometry": row.geometry.__geo_interface__,
-                        "properties": {},
-                    }
-                ],
-            },
-        }
-
-        if indicator == "attribute-completeness":
-            params["attributes"] = ["name"]# TODO: figure out how to pass attribute completeness as optional partition
-
-        headers = {"Accept": "application/json", "Content-Type": "application/json"}
-        url = f"{ohsome_api.base_url}/indicators/{indicator}"
-        resp = requests.post(url, json=params, headers=headers, timeout=120)
-        resp.raise_for_status()
-
-        out_path = raw_dir / f"{topic}__{indicator}__{geom_id}.json"
-        with open(out_path, "w") as f:
-            json.dump(resp.json(), f)
-        success += 1
+    success = oqapi_requests(gdf=gdf, topic=topic, indicator=INDICATOR, raw_dir=raw_dir)
 
     return dg.Output(
         {"raw_dir": str(raw_dir)},
         metadata={
             "country": country,
             "topic": topic,
-            "indicator": indicator,
+            "indicator": INDICATOR,
             "cells_processed": success,
         },
     )
-# TODO: how to get all possible partition combinations?
+
+
+@dg.asset(
+    deps=["h3_hexgrid"],
+    partitions_def=multi_partitions_oqapi_request,
+)
+def responses_user_activity(
+    context: dg.AssetExecutionContext,
+    h3_hexgrid: str,
+    config: ApiRequestConfig,
+):
+    INDICATOR = "user-activity"
+    keys = context.partition_key.keys_by_dimension
+    country = keys["country"]
+    topic = keys["topic"]
+
+    raw_dir = Path("data") / country / f"raw_responses_{topic}" / "hex"
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    gdf = gpd.read_file(h3_hexgrid)
+
+    success = oqapi_requests(gdf=gdf, topic=topic, indicator=INDICATOR, raw_dir=raw_dir)
+
+    return dg.Output(
+        {"raw_dir": str(raw_dir)},
+        metadata={
+            "country": country,
+            "topic": topic,
+            "indicator": INDICATOR,
+            "cells_processed": success,
+        },
+    )
+
+# TODO: how to do attribute completeness?
