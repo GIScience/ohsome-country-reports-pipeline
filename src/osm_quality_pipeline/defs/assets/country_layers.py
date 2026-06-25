@@ -18,7 +18,8 @@ logger = dg.get_dagster_logger()
 
 
 @dg.asset(
-    partitions_def=country_partitions
+    partitions_def=country_partitions,
+    group_name="preparation"
 )
 def country_layers(context) -> dg.MaterializeResult[list[str]]:
     country = context.partition_key
