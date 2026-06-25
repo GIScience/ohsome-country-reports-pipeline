@@ -6,8 +6,13 @@ import zipfile
 import geopandas as gpd
 from osm_quality_pipeline.defs.resources import OhsomeQualityApiResource
 import json
-
+import dagster as dg
 from attr import dataclass
+
+
+
+logger = dg.get_dagster_logger()
+
 
 
 def download_bkg_boundaries(list_url, level_val, out_dir):  #layer: vg25_sta, vg25_lan, vg25_gem
@@ -41,6 +46,7 @@ def download_bkg_boundaries(list_url, level_val, out_dir):  #layer: vg25_sta, vg
 def oqapi_requests(gdf, topic, indicator, raw_dir):
     success = 0
 
+    logger.info(f"start oqapi queries for: {topic}, {indicator}")
     for _, row in gdf.iterrows():
         geom_id = row["id"]
         params = {
@@ -70,6 +76,7 @@ def oqapi_requests(gdf, topic, indicator, raw_dir):
         with open(out_path, "w") as f:
             json.dump(resp.json(), f)
         success += 1
+        logger.info(f"finished: {_+1}/{len(gdf)}")
 
     return success
 
