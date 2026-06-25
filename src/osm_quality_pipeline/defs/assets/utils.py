@@ -115,4 +115,4 @@ def oqapi_requests(gdf, topic, indicator, raw_dir):
             json.dump(resp.json(), f)
         success += 1
 
-        return success
+    return success
