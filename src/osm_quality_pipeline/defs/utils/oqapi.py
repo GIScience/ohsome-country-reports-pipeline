@@ -8,10 +8,10 @@ from osm_quality_pipeline.defs.resources import OhsomeQualityApiResource
 logger = dg.get_dagster_logger()
 
 
-def oqapi_requests(gdf, topic, indicator, raw_dir):
+def oqapi_requests(gdf, topic, indicator, raw_dir, attribute = None):
     success = 0
 
-    logger.info(f"start oqapi queries for: {topic}, {indicator}")
+    logger.info(f"start oqapi queries for: {topic}, {indicator}, {attribute}")
     for _, row in gdf.iterrows():
         geom_id = row["id"]
         params = {
@@ -29,7 +29,7 @@ def oqapi_requests(gdf, topic, indicator, raw_dir):
         }
 
         if indicator == "attribute-completeness":
-            params["attributes"] = ["name"]  # TODO: figure out how to pass attribute completeness as optional partition
+            params["attributes"] = [attribute]  # TODO: figure out how to pass attribute completeness as optional partition
 
         ApiResource = OhsomeQualityApiResource()
         headers = {"Accept": "application/json", "Content-Type": "application/json"}
