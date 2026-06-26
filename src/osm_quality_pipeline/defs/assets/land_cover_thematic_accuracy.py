@@ -25,6 +25,18 @@ def land_cover_thematic_accuracy(
     country = country_layer.country
     layer = country_layer.layer
 
+    if country != "DEU":
+        logger.info(f"Indicator is only available for DEU. Can't process for {country}.")
+        return dg.Output(
+            {"raw_dir": "none"},
+            metadata={
+                "country": country,
+                "topic": TOPIC,
+                "indicator": INDICATOR,
+                "cells_processed": 0,
+            },
+        )
+
     raw_dir = Path("data") / country / f"raw_responses_{TOPIC}" / layer
     raw_dir.mkdir(parents=True, exist_ok=True)
 
