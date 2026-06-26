@@ -9,7 +9,12 @@ import sys
 
 
 from osm_quality_pipeline.defs.partitions import country_partitions
-from osm_quality_pipeline.defs.constants import H3_ZOOM_LEVEL, BKG_BOUNDARY_URL, DATA_DIR
+from osm_quality_pipeline.defs.constants import (
+    H3_ZOOM_LEVEL,
+    BKG_BOUNDARY_URL,
+    BKG_BOUNDARY_LEVEL,
+    DATA_DIR,
+)
 
 import h3
 from shapely.geometry import shape, box
@@ -18,10 +23,7 @@ from shapely.geometry import shape, box
 logger = dg.get_dagster_logger()
 
 
-@dg.asset(
-    partitions_def=country_partitions,
-    group_name="preparation"
-)
+@dg.asset(partitions_def=country_partitions, group_name="preparation")
 def country_layers(context) -> dg.MaterializeResult[list[str]]:
     country = context.partition_key
     logger.info(country)
@@ -35,8 +37,28 @@ def country_layers(context) -> dg.MaterializeResult[list[str]]:
     if country == "DEU":
         logger.info("download from BKG for Germany")
 
-        adm0_boundary_path = download_from_bkg(level_val="vg25_sta")
-        logger.info(adm0_boundary_path)
+        germany_dir = DATA_DIR / "DEU"
+        germany_dir.mkdir(parents=True, exist_ok=True)
+        gpkg_path = germany_dir / "DE_VG25.gpkg"
+
+        try:
+            resp = r.get(BKG_BOUNDARY_URL)
+            resp.raise_for_status()
+        except r.RequestException as e:
+            print(f"ERROR fetching boundary list: {e}", file=sys.stderr)
+            sys.exit(1)
+
+        with zipfile.ZipFile(io.BytesIO(resp.content)) as z:
+            with z.open("daten/DE_VG25.gpkg") as source:
+                gpkg_path.write_bytes(source.read())
+
+        for level_val in BKG_BOUNDARY_LEVEL:
+            logger.info(f"processing {level_val} layer")
+            out_path = download_from_bkg(level_val=level_val, gpkg_path=gpkg_path)
+            if level_val == "vg25_sta":
+                adm0_boundary_path = out_path
+
+        gpkg_path.unlink()
 
         create_h3_layer(country, adm0_boundary_path, out_dir)
 
@@ -46,7 +68,9 @@ def country_layers(context) -> dg.MaterializeResult[list[str]]:
             f"{country}|gemeinden",
             f"{country}|h3",
         ]
-        context.instance.add_dynamic_partitions("dynamic_country_layers", updated_partitions)
+        context.instance.add_dynamic_partitions(
+            "dynamic_country_layers", updated_partitions
+        )
 
     else:
         logger.info("download from geoboundaries")
@@ -55,11 +79,13 @@ def country_layers(context) -> dg.MaterializeResult[list[str]]:
                 country=country,
                 level_val="boundaryType",
                 url_val="gjDownloadURL",
-                out_dir=out_dir
+                out_dir=out_dir,
             )
         except SystemExit as e:
             context.log.warning(f"[{country}] geoBoundaries download failed: {e}")
-            raise Exception(f"Failed to fetch boundaries for {country} from geoBoundaries.")
+            raise Exception(
+                f"Failed to fetch boundaries for {country} from geoBoundaries."
+            )
 
         adm0_boundary_path = os.path.join("data", country, f"{country}_adm0.gpkg")
         create_h3_layer(country, adm0_boundary_path, out_dir)
@@ -69,8 +95,9 @@ def country_layers(context) -> dg.MaterializeResult[list[str]]:
             f"{country}|adm1",
             f"{country}|h3",
         ]
-        context.instance.add_dynamic_partitions("dynamic_country_layers", updated_partitions)
-
+        context.instance.add_dynamic_partitions(
+            "dynamic_country_layers", updated_partitions
+        )
 
     return dg.MaterializeResult(
         value=updated_partitions, metadata={"partitions": updated_partitions}
@@ -115,8 +142,20 @@ def download_from_geoboundaries(country, level_val, url_val, out_dir):
             any_failures = True
             continue
 
-        with open(out_path, "wb") as fp:
-            fp.write(download.content)
+        gdf = gpd.read_file(io.BytesIO(download.content))
+        if "id" not in gdf.columns:
+            adm_level = (
+                os.path.basename(out_path)
+                .split("_")[1]
+                .replace("adm", "")
+                .replace(".gpkg", "")
+            )
+            gdf = gdf.reset_index(drop=True)
+            gdf["id"] = [
+                f"{country}_adm{adm_level}_{str(i + 1).zfill(2)}"
+                for i in range(len(gdf))
+            ]
+            gdf.to_file(out_path, driver="GPKG")
         print(f"[{level}] Saved to {out_path}")
 
     if any_failures:
@@ -126,34 +165,37 @@ def download_from_geoboundaries(country, level_val, url_val, out_dir):
         print("All available boundaries downloaded successfully.")
 
 
-def download_from_bkg(level_val):   #layer: vg25_sta, vg25_lan, vg25_gem
+def download_from_bkg(level_val, gpkg_path=None):  # layer: vg25_sta, vg25_lan, vg25_gem
 
     germany_dir = DATA_DIR / "DEU"
     germany_dir.mkdir(parents=True, exist_ok=True)
-    gpkg_path = germany_dir / "DE_VG25.gpkg"
-    out_path = germany_dir / f"{level_val}.geojson"
+    out_path = germany_dir / f"DEU_{level_val}.gpkg"
 
-    try:
-        resp = r.get(BKG_BOUNDARY_URL)
-        resp.raise_for_status()
-    except r.RequestException as e:
-        print(f"ERROR fetching boundary list: {e}", file=sys.stderr)
-        sys.exit(1)
+    should_cleanup = gpkg_path is None
+    if gpkg_path is None:
+        gpkg_path = germany_dir / "DE_VG25.gpkg"
+        try:
+            resp = r.get(BKG_BOUNDARY_URL)
+            resp.raise_for_status()
+        except r.RequestException as e:
+            print(f"ERROR fetching boundary list: {e}", file=sys.stderr)
+            sys.exit(1)
 
-    with zipfile.ZipFile(io.BytesIO(resp.content)) as z:
-        zip_path = "daten/DE_VG25.gpkg"
-        with z.open(zip_path) as source:
-            gpkg_path.write_bytes(source.read())
+        with zipfile.ZipFile(io.BytesIO(resp.content)) as z:
+            zip_path = "daten/DE_VG25.gpkg"
+            with z.open(zip_path) as source:
+                gpkg_path.write_bytes(source.read())
 
-    gdf = (
-        gpd.read_file(gpkg_path, layer=level_val)
-        .to_crs(4326)
-    )
+    gdf = gpd.read_file(gpkg_path, layer=level_val).to_crs(4326)
 
     gdf = gdf[gdf.geometry.notnull() & gdf.is_valid]
-    gdf.to_file(out_path, driver="GeoJSON")
+    if "id" not in gdf.columns:
+        gdf = gdf.reset_index(drop=True)
+        gdf["id"] = [f"DEU_{level_val}_{str(i + 1).zfill(2)}" for i in range(len(gdf))]
+    gdf.to_file(out_path, driver="GPKG")
 
-    gpkg_path.unlink()
+    if should_cleanup:
+        gpkg_path.unlink()
 
     return out_path
 
@@ -171,9 +213,7 @@ def create_h3_gdf(gdf, country):
         geometry=cell_series.apply(lambda c: shape(h3.cells_to_geo([c]))),
         crs="EPSG:4326",
     )
-    gdf = gpd.GeoDataFrame(
-        gdf[["geometry"]], geometry="geometry", crs="EPSG:4326"
-    )
+    gdf = gpd.GeoDataFrame(gdf[["geometry"]], geometry="geometry", crs="EPSG:4326")
     grid_clipped = gpd.overlay(grid_gdf, gdf, how="intersection").reset_index(drop=True)
 
     grid_clipped["country"] = country
@@ -219,8 +259,3 @@ def create_h3_layer(country, adm0_boundary_path, out_dir):
     grid_clipped, zoom_level = create_h3_gdf(gdf=gdf, country=country)
     output_path = os.path.join(out_dir, f"{country}_h3.gpkg")
     grid_clipped.to_file(output_path, driver="GPKG")
-
-
-
-
-
