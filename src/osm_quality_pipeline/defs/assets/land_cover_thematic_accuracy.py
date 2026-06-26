@@ -6,8 +6,8 @@ import dagster as dg
 import geopandas as gpd
 import requests
 
-from osm_quality_pipeline.defs.partitions import dynamic_country_layers_partition
-from osm_quality_pipeline.defs.assets.utils import oqapi_requests, get_country_layer_from_partitionkey
+from osm_quality_pipeline.defs.partitions import dynamic_country_layers_partition, get_country_layer_from_partitionkey
+from osm_quality_pipeline.defs.utils.oqapi import oqapi_requests
 
 
 logger = dg.get_dagster_logger()
