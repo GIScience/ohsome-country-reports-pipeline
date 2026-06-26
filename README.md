@@ -20,12 +20,6 @@ To install the python dependencies with pip. While in the course specific direct
 ```sh
 python3 -m venv .venv
 ```
-This will create a virtual environment. To enter the newly created virtual environment:
-| OS      | Command                  |
-|---------|--------------------------|
-| MacOS   | `source .venv/bin/activate` |
-| Windows | `.venv\Scripts\activate`   |
-
 To install the required dependencies:
 ```sh
 pip install -e ".[dev]"
