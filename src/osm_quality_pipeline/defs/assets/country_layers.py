@@ -5,6 +5,7 @@ import geopandas as gpd
 import requests as r
 import zipfile
 import io
+import sys
 
 
 from osm_quality_pipeline.defs.partitions import country_partitions
@@ -60,7 +61,7 @@ def country_layers(context) -> dg.MaterializeResult[list[str]]:
             context.log.warning(f"[{country}] geoBoundaries download failed: {e}")
             raise Exception(f"Failed to fetch boundaries for {country} from geoBoundaries.")
 
-        adm0_boundary_path = os.path.join("data", country, "boundary_ADM0.geojson")
+        adm0_boundary_path = os.path.join("data", country, f"{country}_adm0.gpkg")
         create_h3_layer(country, adm0_boundary_path, out_dir)
 
         updated_partitions = [
@@ -103,7 +104,7 @@ def download_from_geoboundaries(country, level_val, url_val, out_dir):
             any_failures = True
             continue
 
-        out_path = os.path.join(out_dir, f"boundary_{level}.geojson")
+        out_path = os.path.join(out_dir, f"{country}_{level.lower()}.gpkg")
 
         print(f"[{level}] Downloading from {url}")
         try:
