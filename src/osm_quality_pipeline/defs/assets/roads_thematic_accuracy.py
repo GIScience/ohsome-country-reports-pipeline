@@ -15,12 +15,12 @@ logger = dg.get_dagster_logger()
 
 @dg.asset(
     partitions_def=dynamic_country_layers_partition,
-    group_name="roads_all_highways",
+    group_name="roads",
     deps="country_layers"
 )
 def roads_thematic_accuracy(context: dg.AssetExecutionContext) -> dg.Output:
     INDICATOR = "roads-thematic-accuracy"
-    TOPIC = "roads-all-highways"
+    TOPIC = "roads"
 
     country_layer = get_country_layer_from_partitionkey(context.partition_key)
     country = country_layer.country

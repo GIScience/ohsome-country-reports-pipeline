@@ -13,26 +13,26 @@ from osm_quality_pipeline.defs.assets.utils import oqapi_requests, get_country_l
 logger = dg.get_dagster_logger()
 
 
-TOPICS_CURRENTNESS = [
+TOPICS_USER_ACTIVITY = [
     "building-count",
     "roads",
     "land-cover"
 ]
 
 
-def make_currentness_asset(topic: str):
+def make_user_activity_asset(topic: str):
     topic_ = topic.replace('-', '_')
 
     @dg.asset(
         partitions_def=dynamic_country_layers_partition,
-        name=f"{topic_}_currentness",
+        name=f"{topic_}_user_activity",
         group_name=topic_,
         deps=["country_layers"]
     )
-    def generic_currentness_asset(context: dg.AssetExecutionContext) -> dg.Output:
+    def generic_user_activity_asset(context: dg.AssetExecutionContext) -> dg.Output:
         f"""Mapping Saturation results as json for topic {topic}"""
 
-        INDICATOR = "currentness"
+        INDICATOR = "mapping-saturation"
 
         country_layer = get_country_layer_from_partitionkey(context.partition_key)
         country = country_layer.country
@@ -41,8 +41,6 @@ def make_currentness_asset(topic: str):
         raw_dir = Path("data") / country / f"raw_responses_{topic}" / layer
         raw_dir.mkdir(parents=True, exist_ok=True)
 
-        # TODO: make this work for all layers
-        # TOOD: store all layers in same data format?
         layer_path = os.path.join("data", country, f"{country}_{layer}.gpkg")
         gdf = gpd.read_file(layer_path)
 
@@ -58,10 +56,10 @@ def make_currentness_asset(topic: str):
             },
         )
 
-    return generic_currentness_asset
+    return generic_user_activity_asset
 
 
-all_currentness_assets = [
-    make_currentness_asset(topic)
-    for topic in TOPICS_CURRENTNESS
+all_user_activity_assets = [
+    make_user_activity_asset(topic)
+    for topic in TOPICS_USER_ACTIVITY
 ]
