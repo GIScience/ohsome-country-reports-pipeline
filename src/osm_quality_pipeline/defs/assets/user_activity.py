@@ -28,9 +28,9 @@ def make_user_activity_asset(topic: str):
         deps=["country_layers"]
     )
     def generic_user_activity_asset(context: dg.AssetExecutionContext) -> dg.Output:
-        f"""Mapping Saturation results as json for topic {topic}"""
+        f"""User activity results as json for topic {topic}"""
 
-        INDICATOR = "mapping-saturation"
+        INDICATOR = "user-activity"
 
         country_layer = get_country_layer_from_partitionkey(context.partition_key)
         country = country_layer.country
