@@ -16,7 +16,7 @@ ADM_LEVELS = ["ADM0", "ADM1"]
 
 BKG_BOUNDARY_URL = "https://daten.gdz.bkg.bund.de/produkte/vg/vg25_ebenen/aktuell/vg25.utm32s.gpkg.zip"
 
-BKG_BOUNDARY_LEVEL = {"vg25_sta", "vg25_krs", "vg25_gem"}
+BKG_BOUNDARY_LEVEL = {"vg25_sta", "vg25_lan", "vg25_gem"}
 
 class ApiRequestConfig(dg.Config):
     max_workers: int = 5
