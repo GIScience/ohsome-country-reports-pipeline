@@ -1,6 +1,15 @@
 import requests
 import dagster as dg
 
+from dagster_aws.s3 import S3Resource
+
+
+s3_resource = S3Resource(
+    aws_access_key_id=dg.EnvVar("S3_KEY_ID"),
+    aws_secret_access_key=dg.EnvVar("S3_SECRET"),
+    endpoint_url="https://" + dg.EnvVar("S3_HOST"),
+)
+
 
 class OhsomeQualityApiResource(dg.ConfigurableResource):
     api_version: str = "v1-test"
@@ -18,5 +27,8 @@ class OhsomeQualityApiResource(dg.ConfigurableResource):
 @dg.definitions
 def resources() -> dg.Definitions:
     return dg.Definitions(
-        resources={"ohsome_api": OhsomeQualityApiResource(api_version="v1-test")}
+        resources={
+            "ohsome_api": OhsomeQualityApiResource(api_version="v1-test"),
+            "s3": s3_resource
+        }
     )
