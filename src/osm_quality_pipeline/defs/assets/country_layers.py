@@ -1,11 +1,5 @@
 import os
 import dagster as dg
-import pandas as pd
-import geopandas as gpd
-import requests as r
-import zipfile
-import io
-import sys
 import urllib.request
 
 from osm_quality_pipeline.defs.utils.geoboundaries import download_from_geoboundaries
@@ -15,9 +9,6 @@ from osm_quality_pipeline.defs.constants import (
     DATA_DIR,
     BoundaryConfig
 )
-
-import h3
-from shapely.geometry import shape, box
 
 
 logger = dg.get_dagster_logger()

@@ -1,10 +1,8 @@
 import os
-import json
 from pathlib import Path
 
 import dagster as dg
 import geopandas as gpd
-import requests
 
 from osm_quality_pipeline.defs.partitions import dynamic_country_layers_partition, get_country_layer_from_partitionkey
 from osm_quality_pipeline.defs.utils.oqapi import oqapi_requests
