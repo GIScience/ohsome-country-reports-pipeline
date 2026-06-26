@@ -34,6 +34,8 @@ def country_layers(context, config: BoundaryConfig) -> dg.MaterializeResult[list
     out_dir = os.path.join("data", country)
     os.makedirs(out_dir, exist_ok=True)
 
+    updated_partitions= []
+
     if country == "DEU":
         logger.info("download from BKG for Germany")
 
@@ -44,15 +46,11 @@ def country_layers(context, config: BoundaryConfig) -> dg.MaterializeResult[list
                 download_url,
                 f"{DATA_DIR}/DEU/DEU_{level_val}.gpkg"
             )
+            updated_partitions.append(f"{country}|{level_val}")
 
         create_h3_layer(country, f"{DATA_DIR}/DEU/DEU_vg25_sta.gpkg", out_dir)
-
-        updated_partitions = [
-            f"{country}|adm0",
-            f"{country}|bundesländer",
-            f"{country}|gemeinden",
-            f"{country}|h3",
-        ]
+        updated_partitions.append(f"{country}|h3")
+        
         context.instance.add_dynamic_partitions(
             "dynamic_country_layers", updated_partitions
         )

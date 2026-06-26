@@ -7,7 +7,7 @@ import geopandas as gpd
 import requests
 
 from osm_quality_pipeline.defs.constants import ApiRequestConfig
-from osm_quality_pipeline.defs.partitions import country_layers_partition, dynamic_country_layers_partition
+from osm_quality_pipeline.defs.partitions import dynamic_country_layers_partition
 from osm_quality_pipeline.defs.assets.utils import oqapi_requests, get_country_layer_from_partitionkey
 
 
@@ -51,7 +51,7 @@ def responses_mapping_saturation(
 
 
 @dg.asset(
-    partitions_def=country_layers_partition,
+    partitions_def=dynamic_country_layers_partition,
 )
 def responses_user_activity(
     context: dg.AssetExecutionContext,
@@ -80,7 +80,7 @@ def responses_user_activity(
 
 
 @dg.asset(
-    partitions_def=country_layers_partition,
+    partitions_def=dynamic_country_layers_partition,
 )
 def responses_roads_thematic_accuracy(
     context: dg.AssetExecutionContext,
@@ -108,7 +108,7 @@ def responses_roads_thematic_accuracy(
     )
 
 @dg.asset(
-    partitions_def=country_layers_partition,
+    partitions_def=dynamic_country_layers_partition,
 )
 def responses_building_comparison(
     context: dg.AssetExecutionContext,
@@ -137,7 +137,7 @@ def responses_building_comparison(
 
 
 @dg.asset(
-    partitions_def=country_layers_partition,
+    partitions_def=dynamic_country_layers_partition,
 )
 def responses_land_cover_completeness(
     context: dg.AssetExecutionContext,
@@ -166,7 +166,7 @@ def responses_land_cover_completeness(
 
 
 @dg.asset(
-    partitions_def=country_layers_partition,
+    partitions_def=dynamic_country_layers_partition,
 )
 def responses_land_cover_thematic_accuracy(
     context: dg.AssetExecutionContext,

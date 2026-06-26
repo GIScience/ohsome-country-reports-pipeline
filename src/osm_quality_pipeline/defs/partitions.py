@@ -17,21 +17,4 @@ multi_partitions_oqapi_request = dg.MultiPartitionsDefinition({
     "topic": topics_partitions,
 })
 
-
-ALL_COUNTRIES_LAYERS = []
-for country in ALL_COUNTRIES:
-    if country == "DEU":
-        ALL_COUNTRIES_LAYERS.append(f"{country}|adm0")
-        ALL_COUNTRIES_LAYERS.append(f"{country}|bundesländer")
-        ALL_COUNTRIES_LAYERS.append(f"{country}|gemeinden")
-        ALL_COUNTRIES_LAYERS.append(f"{country}|h3")
-    else:
-        ALL_COUNTRIES_LAYERS.append(f"{country}|adm0")
-        ALL_COUNTRIES_LAYERS.append(f"{country}|adm1")
-        ALL_COUNTRIES_LAYERS.append(f"{country}|h3")
-
-country_layers_partition = dg.StaticPartitionsDefinition(partition_keys=ALL_COUNTRIES_LAYERS)
-
-
-
 dynamic_country_layers_partition = dg.DynamicPartitionsDefinition(name="dynamic_country_layers")
