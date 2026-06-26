@@ -6,14 +6,14 @@ import requests as r
 import zipfile
 import io
 import sys
+import urllib.request
 
 
 from osm_quality_pipeline.defs.partitions import country_partitions
 from osm_quality_pipeline.defs.constants import (
     H3_ZOOM_LEVEL,
-    BKG_BOUNDARY_URL,
-    BKG_BOUNDARY_LEVEL,
     DATA_DIR,
+    BoundaryConfig
 )
 
 import h3
@@ -24,7 +24,7 @@ logger = dg.get_dagster_logger()
 
 
 @dg.asset(partitions_def=country_partitions, group_name="preparation")
-def country_layers(context) -> dg.MaterializeResult[list[str]]:
+def country_layers(context, config: BoundaryConfig) -> dg.MaterializeResult[list[str]]:
     country = context.partition_key
     logger.info(country)
 
@@ -37,30 +37,15 @@ def country_layers(context) -> dg.MaterializeResult[list[str]]:
     if country == "DEU":
         logger.info("download from BKG for Germany")
 
-        germany_dir = DATA_DIR / "DEU"
-        germany_dir.mkdir(parents=True, exist_ok=True)
-        gpkg_path = germany_dir / "DE_VG25.gpkg"
+        for level_val in config.bkg_boundary_levels:
+            download_url = f"{config.bkg_boundary_url}/DEU_{level_val}.gpkg"
+            logger.info(f"start download: {download_url}")
+            urllib.request.urlretrieve(
+                download_url,
+                f"{DATA_DIR}/DEU/DEU_{level_val}.gpkg"
+            )
 
-        try:
-            resp = r.get(BKG_BOUNDARY_URL)
-            resp.raise_for_status()
-        except r.RequestException as e:
-            print(f"ERROR fetching boundary list: {e}", file=sys.stderr)
-            sys.exit(1)
-
-        with zipfile.ZipFile(io.BytesIO(resp.content)) as z:
-            with z.open("daten/DE_VG25.gpkg") as source:
-                gpkg_path.write_bytes(source.read())
-
-        for level_val in BKG_BOUNDARY_LEVEL:
-            logger.info(f"processing {level_val} layer")
-            out_path = download_from_bkg(level_val=level_val, gpkg_path=gpkg_path)
-            if level_val == "vg25_sta":
-                adm0_boundary_path = out_path
-
-        gpkg_path.unlink()
-
-        create_h3_layer(country, adm0_boundary_path, out_dir)
+        create_h3_layer(country, f"{DATA_DIR}/DEU/DEU_vg25_sta.gpkg", out_dir)
 
         updated_partitions = [
             f"{country}|adm0",
@@ -74,18 +59,13 @@ def country_layers(context) -> dg.MaterializeResult[list[str]]:
 
     else:
         logger.info("download from geoboundaries")
-        try:
-            download_from_geoboundaries(
-                country=country,
-                level_val="boundaryType",
-                url_val="gjDownloadURL",
-                out_dir=out_dir,
-            )
-        except SystemExit as e:
-            context.log.warning(f"[{country}] geoBoundaries download failed: {e}")
-            raise Exception(
-                f"Failed to fetch boundaries for {country} from geoBoundaries."
-            )
+
+        download_from_geoboundaries(
+            country=country,
+            level_val="boundaryType",
+            url_val="gjDownloadURL",
+            out_dir=out_dir,
+        )
 
         adm0_boundary_path = os.path.join("data", country, f"{country}_adm0.gpkg")
         create_h3_layer(country, adm0_boundary_path, out_dir)
@@ -163,41 +143,6 @@ def download_from_geoboundaries(country, level_val, url_val, out_dir):
         sys.exit(1)
     else:
         print("All available boundaries downloaded successfully.")
-
-
-def download_from_bkg(level_val, gpkg_path=None):  # layer: vg25_sta, vg25_lan, vg25_gem
-
-    germany_dir = DATA_DIR / "DEU"
-    germany_dir.mkdir(parents=True, exist_ok=True)
-    out_path = germany_dir / f"DEU_{level_val}.gpkg"
-
-    should_cleanup = gpkg_path is None
-    if gpkg_path is None:
-        gpkg_path = germany_dir / "DE_VG25.gpkg"
-        try:
-            resp = r.get(BKG_BOUNDARY_URL)
-            resp.raise_for_status()
-        except r.RequestException as e:
-            print(f"ERROR fetching boundary list: {e}", file=sys.stderr)
-            sys.exit(1)
-
-        with zipfile.ZipFile(io.BytesIO(resp.content)) as z:
-            zip_path = "daten/DE_VG25.gpkg"
-            with z.open(zip_path) as source:
-                gpkg_path.write_bytes(source.read())
-
-    gdf = gpd.read_file(gpkg_path, layer=level_val).to_crs(4326)
-
-    gdf = gdf[gdf.geometry.notnull() & gdf.is_valid]
-    if "id" not in gdf.columns:
-        gdf = gdf.reset_index(drop=True)
-        gdf["id"] = [f"DEU_{level_val}_{str(i + 1).zfill(2)}" for i in range(len(gdf))]
-    gdf.to_file(out_path, driver="GPKG")
-
-    if should_cleanup:
-        gpkg_path.unlink()
-
-    return out_path
 
 
 def create_h3_gdf(gdf, country):
