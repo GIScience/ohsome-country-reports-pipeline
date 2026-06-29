@@ -14,7 +14,9 @@ logger = dg.get_dagster_logger()
 TOPICS_MAPPING_SATURATION = [
     "building-count",
     "roads",
-    "land-cover"
+    "land-cover",
+    "schools",
+    "hospitals"
 ]
 
 

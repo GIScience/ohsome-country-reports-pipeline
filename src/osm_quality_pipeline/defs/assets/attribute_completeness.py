@@ -13,13 +13,17 @@ logger = dg.get_dagster_logger()
 
 TOPICS_ATTRIBUTE_COMPLETENESS = [
     "building-count",
-    "roads"
+    "roads",
+    "schools",
+    "hospitals"
 ]
 
 
 TOPIC_ATTRIBUTES = {
     "building-count": ["height", "building-material"],
-    "roads": ["name", "maxspeed", "surface"]
+    "roads": ["name", "maxspeed", "surface"],
+    "schools": ["name", "phone-number", "website"],
+    "hospitals": ["emergency", "name", "opening-hours","speciality"]
 }
 
 
