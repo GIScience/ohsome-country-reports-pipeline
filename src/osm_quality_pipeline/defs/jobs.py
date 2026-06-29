@@ -33,3 +33,17 @@ land_cover_job = dg.define_asset_job(
     selection='group:"land_cover"',
     partitions_def=dynamic_country_layers_partition
 )
+
+schools_job = dg.define_asset_job(
+    name="schools_job",
+    description="Calculate all quality indicators for the topic schools",
+    selection='group:"schools"',
+    partitions_def=dynamic_country_layers_partition
+)
+
+hospitals_job = dg.define_asset_job(
+    name="hospitals_job",
+    description="Calculate all quality indicators for the topic hospitals",
+    selection='group:"hospitals"',
+    partitions_def=dynamic_country_layers_partition
+)
