@@ -6,7 +6,7 @@ from osm_quality_pipeline.defs.partitions import dynamic_country_layers_partitio
 all_topics_job = dg.define_asset_job(
     name="all_topics_job",
     description="Calculate all quality indicators for the topics building-count, roads and land-cover",
-    selection='group:"building_count" or group:"roads" or group:"land_cover"',
+    selection='group:"building_count" or group:"roads" or group:"land_cover, group:"schools" or group:"hospitals"',
     partitions_def=dynamic_country_layers_partition
 )
 
