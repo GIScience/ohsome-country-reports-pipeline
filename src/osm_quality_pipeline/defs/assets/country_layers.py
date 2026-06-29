@@ -27,23 +27,27 @@ def country_layers(context, config: BoundaryConfig) -> dg.MaterializeResult[list
     if country == "DEU":
         updated_partitions = country_layers_germany(context, config, country, out_dir)
     else:
-        updated_partitions = country_layers_geoboundaries(context, country, out_dir)
+        updated_partitions = country_layers_geoboundaries(context, config, country, out_dir)
 
     return dg.MaterializeResult(
         value=updated_partitions, metadata={"partitions": updated_partitions}
     )
 
 
-def country_layers_geoboundaries(context, country, out_dir):
-    logger.info(f"download geo boundaries and create partitions for {country}")
-    download_from_geoboundaries(
-        country=country,
-        level_val="boundaryType",
-        url_val="gjDownloadURL",
-        out_dir=out_dir,
-    )
+def country_layers_geoboundaries(context, config, country, out_dir):
+    for level_val in config.geoboundaries_levels:
+        logger.info(f"download geo boundaries and create partitions for {country}|{level_val}")
+
+        download_from_geoboundaries(
+            country=country,
+            level_val=level_val,
+            url_val="gjDownloadURL",
+            out_dir=out_dir,
+        )
     adm0_boundary_path = os.path.join("data", country, f"{country}_adm0.gpkg")
+    
     create_h3_layer(country, adm0_boundary_path, out_dir)
+    logger.info(f"generated h3 layer for {country}")
     updated_partitions = [
         f"{country}|adm0",
         f"{country}|adm1",
@@ -52,6 +56,7 @@ def country_layers_geoboundaries(context, country, out_dir):
     context.instance.add_dynamic_partitions(
         "dynamic_country_layers", updated_partitions
     )
+    logger.info(f"added dynamic partitions for {country}: {updated_partitions}")
     return updated_partitions
 
 
@@ -74,7 +79,7 @@ def country_layers_germany(context, config, country, out_dir):
     context.instance.add_dynamic_partitions(
         "dynamic_country_layers", updated_partitions
     )
-
+    logger.info(f"added dynamic partitions for {country}: {updated_partitions}")
     return updated_partitions
 
 
