@@ -1,8 +1,4 @@
-import os
-from pathlib import Path
-
 import dagster as dg
-import geopandas as gpd
 import pandas as pd
 
 from osm_quality_pipeline.defs.partitions import dynamic_country_layers_partition, get_country_layer_from_partitionkey
