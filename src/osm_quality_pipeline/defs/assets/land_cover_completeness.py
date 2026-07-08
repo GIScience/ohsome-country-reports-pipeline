@@ -14,7 +14,8 @@ logger = dg.get_dagster_logger()
     group_name="land_cover",
     metadata={
         "partition_expr": "partition_key"  # DuckDB maps partitions to the 'partition_key' column
-    }
+    },
+    io_manager_key="duckdb_io_manager"
 )
 def land_cover_completeness(
     context: dg.AssetExecutionContext,

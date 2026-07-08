@@ -1,12 +1,9 @@
-import os
-from pathlib import Path
-
 import dagster as dg
-import geopandas as gpd
+import pandas as pd
 
 from osm_quality_pipeline.defs.partitions import dynamic_country_layers_partition, get_country_layer_from_partitionkey
 from osm_quality_pipeline.defs.utils.oqapi import oqapi_requests
-
+from osm_quality_pipeline.defs.utils.utils import load_layer_as_gdf
 
 logger = dg.get_dagster_logger()
 
@@ -34,10 +31,14 @@ def make_attribute_completeness_asset(topic: str):
         partitions_def=dynamic_country_layers_partition,
         name=f"{topic_}_attribute_completeness",
         group_name=topic_,
-        deps=["country_layers"]
+        deps=["country_layers"],
+        metadata={
+            "partition_expr": "partition_key"  # DuckDB maps partitions to the 'partition_key' column
+        },
+        io_manager_key="duckdb_io_manager"
     )
-    def generic_attribute_completeness_asset(context: dg.AssetExecutionContext) -> dg.Output:
-        f"""Mapping Saturation results as json for topic {topic}"""
+    def generic_attribute_completeness_asset(context: dg.AssetExecutionContext) -> pd.DataFrame:
+        f"""Attribute completeness results as json for topic {topic}"""
 
         INDICATOR = "attribute-completeness"
 
@@ -45,24 +46,15 @@ def make_attribute_completeness_asset(topic: str):
         country = country_layer.country
         layer = country_layer.layer
 
-        raw_dir = Path("data") / country / f"raw_responses_{topic}" / layer
-        raw_dir.mkdir(parents=True, exist_ok=True)
+        gdf = load_layer_as_gdf(context, country, layer)
 
-        layer_path = os.path.join("data", country, f"{country}_{layer}.gpkg")
-        gdf = gpd.read_file(layer_path)
-
+        df_list = []
         for attribute in TOPIC_ATTRIBUTES[topic]:
-            success = oqapi_requests(gdf=gdf, topic=topic, indicator=INDICATOR, raw_dir=raw_dir, attribute=attribute)
+            df = oqapi_requests(gdf=gdf, topic=topic, indicator=INDICATOR, attribute=attribute)
+            df["attribute"] = attribute
+            df_list.append(df)
 
-        return dg.Output(
-            {"raw_dir": str(raw_dir)},
-            metadata={
-                "country": country,
-                "topic": topic,
-                "indicator": INDICATOR,
-                "cells_processed": success,
-            },
-        )
+        return pd.concat(df_list)
 
     return generic_attribute_completeness_asset
 

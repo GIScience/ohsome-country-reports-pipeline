@@ -27,7 +27,8 @@ def make_user_activity_asset(topic: str):
         deps=["country_layers"],
         metadata={
             "partition_expr": "partition_key"  # DuckDB maps partitions to the 'partition_key' column
-        }
+        },
+        io_manager_key="duckdb_io_manager"
     )
     def generic_user_activity_asset(context: dg.AssetExecutionContext) -> pd.DataFrame:
         f"""User activity results as json for topic {topic}"""

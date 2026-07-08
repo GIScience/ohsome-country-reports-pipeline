@@ -36,6 +36,6 @@ def resources() -> dg.Definitions:
         resources={
             "ohsome_api": OhsomeQualityApiResource(api_version="v1-test"),
             "s3": s3_resource,
-            "io_manager": duckdb_io_manager
+            "duckdb_io_manager": duckdb_io_manager
         }
     )

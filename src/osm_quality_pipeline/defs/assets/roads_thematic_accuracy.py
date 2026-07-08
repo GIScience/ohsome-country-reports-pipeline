@@ -11,7 +11,11 @@ logger = dg.get_dagster_logger()
 @dg.asset(
     partitions_def=dynamic_country_layers_partition,
     group_name="roads",
-    deps="country_layers"
+    deps="country_layers",
+    metadata={
+        "partition_expr": "partition_key"  # DuckDB maps partitions to the 'partition_key' column
+    },
+    io_manager_key="duckdb_io_manager"
 )
 def roads_thematic_accuracy(context: dg.AssetExecutionContext) -> pd.DataFrame:
     INDICATOR = "roads-thematic-accuracy"
