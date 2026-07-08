@@ -8,8 +8,11 @@ from osm_quality_pipeline.defs.resources import OhsomeQualityApiResource
 logger = dg.get_dagster_logger()
 
 
-def oqapi_requests(gdf, topic, indicator, raw_dir, attribute = None):
+def oqapi_requests(gdf, topic, indicator, raw_dir, attribute=None):
     logger.info(f"start oqapi queries for: {topic}, {indicator}, {attribute}")
+
+    new_columns = []
+
     for _, row in gdf.iterrows():
         geom_id = row["id"]
         params = {
@@ -27,7 +30,9 @@ def oqapi_requests(gdf, topic, indicator, raw_dir, attribute = None):
         }
 
         if indicator == "attribute-completeness":
-            params["attributes"] = [attribute]  # TODO: figure out how to pass attribute completeness as optional partition
+            params["attributes"] = [
+                attribute
+            ]  # TODO: figure out how to pass attribute completeness as optional partition
 
         ApiResource = OhsomeQualityApiResource()
         headers = {"Accept": "application/json", "Content-Type": "application/json"}
@@ -42,16 +47,29 @@ def oqapi_requests(gdf, topic, indicator, raw_dir, attribute = None):
         # write function to extract values from json response
         row_results = extract_values_from_oqapi_response(resp)
 
-        # do something to add these values to the geopandas df
+        new_columns.append(row_results)
 
+        logger.info(f"finished: {_ + 1}/{len(gdf)}")
+    
+    gdf["topic"] = [col[0] for col in new_columns]
+    gdf["indicator"] = [col[1] for col in new_columns]
+    gdf["status_code"] = [col[2] for col in new_columns]
+    gdf["value"] = [col[3] for col in new_columns]
+    gdf["description"] = [col[4] for col in new_columns]
 
-        logger.info(f"finished: {_+1}/{len(gdf)}")
-
+    print(gdf)
     # return gdf with additional columns instead of success
     return gdf
 
 
 def extract_values_from_oqapi_response(response):
-    # do something to extrac the values from reponse_json
-    # topic, indicator, status_code, value, description
-    return ["building_count", "mapping_saturation", 200, 1.0, "this is the description"]
+    data = response.json()
+    result = data["result"][0]
+    return [
+        result["topic"]["name"],
+        result["metadata"]["name"],
+        response.status_code,
+        result["result"]["value"],
+        result["result"]["description"],
+    ]
+ 
