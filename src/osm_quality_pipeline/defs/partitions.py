@@ -21,7 +21,7 @@ class CountryLayer:
 
 
 def get_country_layer_from_partitionkey(country_layer_partitionkey: str) -> CountryLayer:
-    "extracts country and layer from <country>|<layer"
+    """Extract country and layer from <country>|<layer. """
     country: str = ""
     layer: str = ""
     partition: str | None = country_layer_partitionkey

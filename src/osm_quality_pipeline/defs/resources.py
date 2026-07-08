@@ -1,8 +1,14 @@
 import requests
 import dagster as dg
 
-from dagster_aws.s3 import S3Resource
+from osm_quality_pipeline.defs.constants import DATA_DIR
 
+from dagster_aws.s3 import S3Resource
+from dagster_duckdb_pandas import DuckDBPandasIOManager
+
+duckdb_io_manager = DuckDBPandasIOManager(
+    database=f"{DATA_DIR}/asset_output.duckdb"
+)
 
 s3_resource = S3Resource(
     aws_access_key_id=dg.EnvVar("S3_KEY_ID"),
@@ -29,6 +35,7 @@ def resources() -> dg.Definitions:
     return dg.Definitions(
         resources={
             "ohsome_api": OhsomeQualityApiResource(api_version="v1-test"),
-            "s3": s3_resource
+            "s3": s3_resource,
+            "io_manager": duckdb_io_manager
         }
     )
