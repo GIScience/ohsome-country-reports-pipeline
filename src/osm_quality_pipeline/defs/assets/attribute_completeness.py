@@ -50,7 +50,7 @@ def make_attribute_completeness_asset(topic: str):
 
         df_list = []
         for attribute in TOPIC_ATTRIBUTES[topic]:
-            df = oqapi_requests(gdf=gdf, topic=topic, indicator=INDICATOR, attribute=attribute)
+            df = oqapi_requests(gdf=gdf.copy(), topic=topic, indicator=INDICATOR, attribute=attribute)
             df["attribute"] = attribute
             df_list.append(df)
 

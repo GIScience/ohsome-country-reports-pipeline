@@ -42,16 +42,19 @@ def oqapi_requests(gdf, topic, indicator, attribute=None):
         row_results = extract_values_from_oqapi_response(resp)
         new_columns.append(row_results)
         logger.info(f"finished: {_ + 1}/{len(gdf)}")
-    
-    gdf["topic"] = [col[0] for col in new_columns]
-    gdf["indicator"] = [col[1] for col in new_columns]
-    gdf["status_code"] = [col[2] for col in new_columns]
-    gdf["value"] = [col[3] for col in new_columns]
-    gdf["description"] = [col[4] for col in new_columns]
 
     # transform into a "normal" pandas df so that it can be stored in duckdb out of the box
     gdf["geometry"] = gdf["geometry"].to_wkb()
+
     df = pd.DataFrame(gdf)
+
+    df["topic"] = [col[0] for col in new_columns]
+    df["indicator"] = [col[1] for col in new_columns]
+    df["status_code"] = [col[2] for col in new_columns]
+    df["value"] = [col[3] for col in new_columns]
+    df["description"] = [col[4] for col in new_columns]
+    df["quality_class"] = [col[5] for col in new_columns]
+    df["osm_timestamp"] = [col[6] for col in new_columns]
 
     return df
 
@@ -59,11 +62,14 @@ def oqapi_requests(gdf, topic, indicator, attribute=None):
 def extract_values_from_oqapi_response(response):
     data = response.json()
     result = data["result"][0]
+
     return [
         result["topic"]["name"],
         result["metadata"]["name"],  # indicator name
         response.status_code,
         result["result"]["value"],
         result["result"]["description"],
+        result["result"]["class"],
+        result["result"]["timestampOSM"]
     ]
  
