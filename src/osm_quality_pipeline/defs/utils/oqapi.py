@@ -44,7 +44,7 @@ def oqapi_requests(gdf, topic, indicator, attribute=None):
         logger.info(f"finished: {_ + 1}/{len(gdf)}")
 
     # transform into a "normal" pandas df so that it can be stored in duckdb out of the box
-    gdf["geometry"] = gdf["geometry"].to_wkb()
+    gdf["geometry"] = gdf["geometry"].to_wkt()
 
     df = pd.DataFrame(gdf)
 

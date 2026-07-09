@@ -27,6 +27,6 @@ def topic_gpkg(context: dg.AssetExecutionContext, building_count_attribute_compl
         building_count_currentness
     ])
 
-    df.geometry = gpd.GeoSeries.from_wkb(df.geometry.apply(bytes.fromhex), crs="EPSG:4326")
-    gdf = gpd.GeoDataFrame(df, geometry=df.geometry, crs="EPSG:4326")
+    df['geometry'] = gpd.GeoSeries.from_wkt(df['geometry'])
+    gdf = gpd.GeoDataFrame(df, geometry="geometry", crs="EPSG:4326")
     gdf.to_file(f"data/{context.partition_key}/Outputs/building_count.gpkg", layer="building_count", driver="GPKG")
