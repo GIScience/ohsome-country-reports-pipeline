@@ -9,7 +9,7 @@ from osm_quality_pipeline.defs.constants import (
     STATIC_TOPIC_ASSETS,
     ALL_TOPICS,
 )
-from osm_quality_pipeline.defs.partitions import dynamic_country_layers_partition
+from osm_quality_pipeline.defs.partitions import dynamic_country_layers_partition, get_country_layer_from_partitionkey
 
 
 def _get_topic_deps(topic: str) -> list[str]:
@@ -45,7 +45,13 @@ def make_topic_gpkg_asset(topic: str):
         df = pd.concat(dfs)
         df["geometry"] = gpd.GeoSeries.from_wkt(df["geometry"])
         gdf = gpd.GeoDataFrame(df, geometry="geometry", crs="EPSG:4326")
-        country_code = context.partition_key.split("|")[0]
+
+        country_layer = get_country_layer_from_partitionkey(context.partition_key)
+        country_code = country_layer.country
+
+        # should this be used in the filepath?
+        layer = country_layer.layer
+
         Path(f"data/{country_code}/Outputs").mkdir(parents=True, exist_ok=True)
         gdf.to_file(
             f"data/{country_code}/Outputs/{country_code}_{topic_}.gpkg",
