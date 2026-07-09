@@ -12,13 +12,20 @@ logger = dg.get_dagster_logger()
     partitions_def=dynamic_country_layers_partition,
     name="topic_gpkg",
     group_name="building_count",
-    deps=["building_count_attribute_completeness", "building_count_mapping_saturation", "building_count_user_activity", "building_count_currentness"],
+    deps=["building_count_attribute_completeness",
+          "building_count_mapping_saturation",
+          "building_count_user_activity",
+          "building_count_currentness"],
     metadata={
         "partition_expr": "partition_key"  # DuckDB maps partitions to the 'partition_key' column
     },
     io_manager_key="duckdb_io_manager"
 )
-def topic_gpkg(context: dg.AssetExecutionContext, building_count_attribute_completeness, building_count_mapping_saturation, building_count_user_activity, building_count_currentness) -> None:
+def topic_gpkg(context: dg.AssetExecutionContext, 
+               building_count_attribute_completeness, 
+               building_count_mapping_saturation, 
+               building_count_user_activity, 
+               building_count_currentness) -> None:
     
     df = pd.concat([
         building_count_attribute_completeness,
@@ -29,4 +36,7 @@ def topic_gpkg(context: dg.AssetExecutionContext, building_count_attribute_compl
 
     df['geometry'] = gpd.GeoSeries.from_wkt(df['geometry'])
     gdf = gpd.GeoDataFrame(df, geometry="geometry", crs="EPSG:4326")
-    gdf.to_file(f"data/{context.partition_key}/Outputs/building_count.gpkg", layer="building_count", driver="GPKG")
+    
+    country_code = context.partition_key.split("|")[0]
+    
+    gdf.to_file(f"data/{country_code}/Outputs/{country_code}_building_count.gpkg", layer="building_count", driver="GPKG")
