@@ -16,7 +16,9 @@ REQUIRED_TOPICS = [
 
 ADM_LEVELS = ["ADM0", "ADM1"]
 
-BKG_BOUNDARY_URL = "https://daten.gdz.bkg.bund.de/produkte/vg/vg25_ebenen/aktuell/vg25.utm32s.gpkg.zip"
+BKG_BOUNDARY_URL = (
+    "https://daten.gdz.bkg.bund.de/produkte/vg/vg25_ebenen/aktuell/vg25.utm32s.gpkg.zip"
+)
 
 
 class S3Config(dg.Config):
@@ -27,7 +29,9 @@ class S3Config(dg.Config):
 
 
 class BoundaryConfig(dg.Config):
-    bkg_boundary_url: str = f"https://storage.heigit.org/heigit-hdx-public/oqapi_hdx/boundaries"
+    bkg_boundary_url: str = (
+        f"https://storage.heigit.org/heigit-hdx-public/oqapi_hdx/boundaries"
+    )
     bkg_boundary_levels: [str] = ["vg2500_sta", "vg2500_lan", "vg25_gem"]
     geoboundaries_levels: [str] = ["ADM0", "ADM1"]
 
@@ -39,3 +43,26 @@ class ApiRequestConfig(dg.Config):
 
 REPO_ROOT = Path(__file__).parent.parent.parent.parent
 DATA_DIR = REPO_ROOT / "data"
+
+TOPICS_BY_INDICATOR = {
+    "currentness": ["building-count", "roads", "land-cover", "schools", "hospitals"],
+    "mapping-saturation": ["building-count","roads","land-cover","schools","hospitals"],
+    "user-activity": ["building-count", "roads", "land-cover", "schools", "hospitals"],
+    "attribute-completeness": ["building-count", "roads", "schools", "hospitals"],
+}
+
+TOPIC_ATTRIBUTES = {
+    "building-count": ["height", "building-material"],
+    "roads": ["name", "maxspeed", "surface"],
+    "schools": ["name", "phone-number", "website"],
+    "hospitals": ["emergency", "name", "opening-hours", "speciality"],
+}
+
+STATIC_TOPIC_ASSETS = {
+    "land-cover": ["land_cover_completeness", "land_cover_thematic_accuracy"],
+    "roads": ["roads_thematic_accuracy"],
+}
+
+ALL_TOPICS = sorted(
+    set(topic for topics in TOPICS_BY_INDICATOR.values() for topic in topics)
+)

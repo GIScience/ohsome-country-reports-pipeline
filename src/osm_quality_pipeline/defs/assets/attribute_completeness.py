@@ -1,31 +1,19 @@
 import dagster as dg
 import pandas as pd
 
-from osm_quality_pipeline.defs.partitions import dynamic_country_layers_partition, get_country_layer_from_partitionkey
+from osm_quality_pipeline.defs.constants import TOPICS_BY_INDICATOR, TOPIC_ATTRIBUTES
+from osm_quality_pipeline.defs.partitions import (
+    dynamic_country_layers_partition,
+    get_country_layer_from_partitionkey,
+)
 from osm_quality_pipeline.defs.utils.oqapi import oqapi_requests
 from osm_quality_pipeline.defs.utils.utils import load_layer_as_gdf
 
 logger = dg.get_dagster_logger()
 
 
-TOPICS_ATTRIBUTE_COMPLETENESS = [
-    "building-count",
-    "roads",
-    "schools",
-    "hospitals"
-]
-
-
-TOPIC_ATTRIBUTES = {
-    "building-count": ["height", "building-material"],
-    "roads": ["name", "maxspeed", "surface"],
-    "schools": ["name", "phone-number", "website"],
-    "hospitals": ["emergency", "name", "opening-hours","speciality"]
-}
-
-
 def make_attribute_completeness_asset(topic: str):
-    topic_ = topic.replace('-', '_')
+    topic_ = topic.replace("-", "_")
 
     @dg.asset(
         partitions_def=dynamic_country_layers_partition,
@@ -35,9 +23,11 @@ def make_attribute_completeness_asset(topic: str):
         metadata={
             "partition_expr": "partition_key"  # DuckDB maps partitions to the 'partition_key' column
         },
-        io_manager_key="duckdb_io_manager"
+        io_manager_key="duckdb_io_manager",
     )
-    def generic_attribute_completeness_asset(context: dg.AssetExecutionContext) -> pd.DataFrame:
+    def generic_attribute_completeness_asset(
+        context: dg.AssetExecutionContext,
+    ) -> pd.DataFrame:
         f"""Attribute completeness results as json for topic {topic}"""
 
         INDICATOR = "attribute-completeness"
@@ -50,7 +40,9 @@ def make_attribute_completeness_asset(topic: str):
 
         df_list = []
         for attribute in TOPIC_ATTRIBUTES[topic]:
-            df = oqapi_requests(gdf=gdf.copy(), topic=topic, indicator=INDICATOR, attribute=attribute)
+            df = oqapi_requests(
+                gdf=gdf.copy(), topic=topic, indicator=INDICATOR, attribute=attribute
+            )
             df["attribute"] = attribute
             df_list.append(df)
 
@@ -61,5 +53,5 @@ def make_attribute_completeness_asset(topic: str):
 
 all_attribute_completeness_assets = [
     make_attribute_completeness_asset(topic)
-    for topic in TOPICS_ATTRIBUTE_COMPLETENESS
+    for topic in TOPICS_BY_INDICATOR["attribute-completeness"]
 ]
