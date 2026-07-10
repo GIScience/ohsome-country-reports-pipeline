@@ -55,6 +55,7 @@ venv/
 ENV/
 env/
 .env/
+.env
 .venv/
 **/venv/
 **/env/
