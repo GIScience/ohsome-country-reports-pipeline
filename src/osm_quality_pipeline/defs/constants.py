@@ -46,7 +46,13 @@ DATA_DIR = REPO_ROOT / "data"
 
 TOPICS_BY_INDICATOR = {
     "currentness": ["building-count", "roads", "land-cover", "schools", "hospitals"],
-    "mapping-saturation": ["building-count","roads","land-cover","schools","hospitals"],
+    "mapping-saturation": [
+        "building-count",
+        "roads",
+        "land-cover",
+        "schools",
+        "hospitals",
+    ],
     "user-activity": ["building-count", "roads", "land-cover", "schools", "hospitals"],
     "attribute-completeness": ["building-count", "roads", "schools", "hospitals"],
 }
@@ -66,3 +72,11 @@ STATIC_TOPIC_ASSETS = {
 ALL_TOPICS = sorted(
     set(topic for topics in TOPICS_BY_INDICATOR.values() for topic in topics)
 )
+
+API_TOPIC_NAMES = {
+    "building-count": "Buildings (count)",
+    "hospitals": "Hospitals",
+    "land-cover": "Land Use and Land Cover",
+    "roads": "Roads (cars)",
+    "schools": "Schools",
+}

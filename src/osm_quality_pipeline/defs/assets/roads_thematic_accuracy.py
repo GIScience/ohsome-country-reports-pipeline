@@ -3,7 +3,7 @@ import pandas as pd
 
 from osm_quality_pipeline.defs.partitions import dynamic_country_layers_partition, get_country_layer_from_partitionkey
 from osm_quality_pipeline.defs.utils.oqapi import oqapi_requests
-from osm_quality_pipeline.defs.utils.utils import load_layer_as_gdf
+from osm_quality_pipeline.defs.utils.utils import load_layer_as_gdf, empty_df
 
 logger = dg.get_dagster_logger()
 
@@ -25,11 +25,12 @@ def roads_thematic_accuracy(context: dg.AssetExecutionContext) -> pd.DataFrame:
     country = country_layer.country
     layer = country_layer.layer
 
+    gdf = load_layer_as_gdf(context, country, layer)
+
     if country != "DEU":
         logger.info(f"Indicator is only available for DEU. Can't process for {country}.")
-        return None
+        return empty_df(gdf, topic=TOPIC, indicator=INDICATOR)
 
-    gdf = load_layer_as_gdf(context, country, layer)
 
     df = oqapi_requests(gdf=gdf, topic=TOPIC, indicator=INDICATOR)
     return df

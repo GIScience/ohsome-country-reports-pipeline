@@ -1,5 +1,6 @@
 import os
 import geopandas as gpd
+import pandas as pd
 
 
 def load_layer_as_gdf(context, country, layer):
@@ -15,3 +16,15 @@ def load_layer_as_gdf(context, country, layer):
 
     gdf["partition_key"] = context.partition_key
     return gdf
+
+def empty_df(gdf, topic, indicator):
+    gdf["geometry"] = gdf["geometry"].to_wkt()
+    df = pd.DataFrame(gdf)
+    df["topic"] = topic
+    df["indicator"] = indicator
+    df["status_code"] = 0
+    df["value"] = 0
+    df["description"] = "skipped: indicator not available for this country"
+    df["quality_class"] = 0
+    df["osm_timestamp"] = ""
+    return df

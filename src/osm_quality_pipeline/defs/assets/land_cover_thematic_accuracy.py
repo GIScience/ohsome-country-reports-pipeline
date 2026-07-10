@@ -3,7 +3,7 @@ import pandas as pd
 
 from osm_quality_pipeline.defs.partitions import dynamic_country_layers_partition, get_country_layer_from_partitionkey
 from osm_quality_pipeline.defs.utils.oqapi import oqapi_requests
-from osm_quality_pipeline.defs.utils.utils import load_layer_as_gdf
+from osm_quality_pipeline.defs.utils.utils import load_layer_as_gdf, empty_df
 
 logger = dg.get_dagster_logger()
 
@@ -16,9 +16,7 @@ logger = dg.get_dagster_logger()
     },
     io_manager_key="duckdb_io_manager"
 )
-def land_cover_thematic_accuracy(
-    context: dg.AssetExecutionContext,
-) -> pd.DataFrame:
+def land_cover_thematic_accuracy(context: dg.AssetExecutionContext,) -> pd.DataFrame:
 
     INDICATOR = "land-cover-thematic-accuracy"
     TOPIC = "land-cover"
@@ -27,11 +25,11 @@ def land_cover_thematic_accuracy(
     country = country_layer.country
     layer = country_layer.layer
 
+    gdf = load_layer_as_gdf(context, country, layer)
+    
     if country != "DEU":
         logger.info(f"Indicator is only available for DEU. Can't process for {country}.")
-        return None
-
-    gdf = load_layer_as_gdf(context, country, layer)
+        return empty_df(gdf, topic=TOPIC, indicator=INDICATOR)
 
     df = oqapi_requests(gdf=gdf, topic=TOPIC, indicator=INDICATOR)
     return df
