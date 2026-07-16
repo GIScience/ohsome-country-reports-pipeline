@@ -32,6 +32,31 @@ ALL_TOPIC_DEPS = _get_all_topic_deps()
 
 ins = {dep: dg.AssetIn(key=dep) for dep in ALL_TOPIC_DEPS}
 
+@dg.asset(
+    partitions_def=dynamic_country_layers_partition,
+    name="indicator_results_csv",
+    group_name="outputs",
+    ins=ins
+)
+def indicator_results_csv(context: dg.AssetExecutionContext, **kwargs) -> None:
+    dfs = [df for df in kwargs.values() if df is not None]
+    if not dfs:
+        return None
+    
+    combined = pd.concat(dfs)
+    combined = combined.drop("geometry", axis=1)
+
+    country_layer = get_country_layer_from_partitionkey(context.partition_key)
+    country_code = country_layer.country
+    layer = country_layer.layer
+
+
+    Path(f"data/{country_code}/Outputs").mkdir(parents=True, exist_ok=True)
+    csv_path = f"data/{country_code}/Outputs/{country_code}_{layer}_indicator_results.csv"
+
+    combined.to_csv(csv_path, encoding='utf-8', index=False)
+
+
 
 @dg.asset(
     partitions_def=dynamic_country_layers_partition,
@@ -68,7 +93,6 @@ def indicator_results_gpkg(context: dg.AssetExecutionContext, **kwargs) -> None:
             else r["indicator"],
             axis=1,
         )
-
         wide = topic_gdf.pivot_table(
             index="id",
             columns="indicator_key",
