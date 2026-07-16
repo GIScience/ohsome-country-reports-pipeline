@@ -55,6 +55,7 @@ def oqapi_requests(gdf, topic, indicator, attribute=None):
     df["description"] = [col[4] for col in new_columns]
     df["quality_class"] = [col[5] for col in new_columns]
     df["osm_timestamp"] = [col[6] for col in new_columns]
+    df["topic_key"] = topic
 
     return df
 
