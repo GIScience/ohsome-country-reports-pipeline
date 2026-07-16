@@ -52,20 +52,20 @@ def indicator_results_gpkg(context: dg.AssetExecutionContext, **kwargs) -> None:
     layer = country_layer.layer
 
     Path(f"data/{country_code}/Outputs").mkdir(parents=True, exist_ok=True)
-    gpkg_path = f"data/{country_code}/Outputs/{country_code}_{layer}.gpkg"
+    gpkg_path = f"data/{country_code}/Outputs/{country_code}_{layer}_indicator_results.gpkg"
 
     first_layer = True
     for topic in ALL_TOPICS:
-        topic_gdf = combined[combined["topic_key"] == topic]
+        topic_gdf = combined[combined["topic"] == topic]
         if topic_gdf.empty:
             continue
 
         topic_ = topic.replace("-", "_")
 
         topic_gdf["indicator_key"] = topic_gdf.apply(
-            lambda r: f"{r['indicator'].replace('-', '_')}_{r['attribute'].replace('-', '_')}"
+            lambda r: f"{r['indicator']}_{r['attribute']}"
             if pd.notna(r.get("attribute"))
-            else r["indicator"].replace("-", "_"),
+            else r["indicator"],
             axis=1,
         )
 

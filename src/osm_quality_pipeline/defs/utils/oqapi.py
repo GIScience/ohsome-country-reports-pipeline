@@ -48,14 +48,13 @@ def oqapi_requests(gdf, topic, indicator, attribute=None):
 
     df = pd.DataFrame(gdf)
 
-    df["topic"] = [col[0] for col in new_columns]
-    df["indicator"] = [col[1] for col in new_columns]
+    df["topic"] = topic
+    df["indicator"] = indicator
     df["status_code"] = [col[2] for col in new_columns]
     df["value"] = [col[3] for col in new_columns]
     df["description"] = [col[4] for col in new_columns]
     df["quality_class"] = [col[5] for col in new_columns]
     df["osm_timestamp"] = [col[6] for col in new_columns]
-    df["topic_key"] = topic
 
     return df
 

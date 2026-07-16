@@ -27,5 +27,4 @@ def empty_df(gdf, topic, indicator):
     df["description"] = "skipped: indicator not available for this country"
     df["quality_class"] = 0
     df["osm_timestamp"] = ""
-    df["topic_key"] = topic
     return df
