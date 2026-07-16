@@ -93,12 +93,14 @@ def indicator_results_gpkg(context: dg.AssetExecutionContext, **kwargs) -> None:
             else r["indicator"],
             axis=1,
         )
-        wide = topic_gdf.pivot_table(
+        wide = topic_gdf.pivot(
             index="id",
             columns="indicator_key",
-            values=["value", "description"],
-            aggfunc="first",
+            values=["value", "description"]
         )
+        wide.columns = wide.columns.swaplevel(0, 1)
+        wide = wide.sort_index(axis=1, level=0)
+
         wide.columns = [f"{ind}_{col}" for col, ind in wide.columns]
         wide = wide.reset_index()
 
