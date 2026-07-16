@@ -32,4 +32,5 @@ def land_cover_thematic_accuracy(context: dg.AssetExecutionContext,) -> pd.DataF
         return empty_df(gdf, topic=TOPIC, indicator=INDICATOR)
 
     df = oqapi_requests(gdf=gdf, topic=TOPIC, indicator=INDICATOR)
+    df["value"] = df["value"].round(4)
     return df

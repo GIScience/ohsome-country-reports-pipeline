@@ -30,4 +30,5 @@ def land_cover_completeness(
     gdf = load_layer_as_gdf(context, country, layer)
 
     df = oqapi_requests(gdf=gdf, topic=TOPIC, indicator=INDICATOR)
+    df["value"] = df["value"].round(4)
     return df

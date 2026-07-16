@@ -44,6 +44,7 @@ def make_attribute_completeness_asset(topic: str):
                 gdf=gdf.copy(), topic=topic, indicator=INDICATOR, attribute=attribute
             )
             df["attribute"] = attribute
+            df["value"] = df["value"].round(4)
             df_list.append(df)
 
         return pd.concat(df_list)
