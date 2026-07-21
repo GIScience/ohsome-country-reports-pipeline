@@ -47,3 +47,10 @@ hospitals_job = dg.define_asset_job(
     selection='group:"hospitals"',
     partitions_def=dynamic_country_layers_partition
 )
+
+all_outputs_job = dg.define_asset_job(
+    name="all_outputs_job",
+    description="Generates csv and gpgk outputs",
+    selection='group:"outputs"',
+    partitions_def=dynamic_country_layers_partition
+)
