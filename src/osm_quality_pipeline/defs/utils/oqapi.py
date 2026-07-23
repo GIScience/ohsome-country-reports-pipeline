@@ -1,3 +1,5 @@
+import datetime
+
 import dagster as dg
 import requests as r
 import pandas as pd
@@ -29,17 +31,51 @@ def oqapi_requests(gdf, topic, indicator, attribute=None):
         }
 
         if indicator == "attribute-completeness":
-            params["attributes"] = [
-                attribute
-            ]
+            params["attributes"] = [attribute]
 
         ApiResource = OhsomeQualityApiResource()
         headers = {"Accept": "application/json", "Content-Type": "application/json"}
         url = f"{ApiResource.base_url}/indicators/{indicator}"
-        resp = r.post(url, json=params, headers=headers, timeout=120)
-        resp.raise_for_status()
+        try:
+            resp = r.post(url, json=params, headers=headers, timeout=120)
+            resp.raise_for_status()
+            row_results = extract_values_from_oqapi_response(resp)
+        except r.Timeout:
+            logger.warning(f"Timeout for {topic}/{indicator} on {geom_id}")
+            row_results = [
+                topic,
+                indicator,
+                999,
+                -999,
+                "Timeout Error",
+                None,
+                datetime.datetime.now(),
+            ]
+        except r.ConnectionError:
+            logger.warning(f"Network failure for {topic}/{indicator} on {geom_id}")
+            row_results = [
+                topic,
+                indicator,
+                998,
+                -999,
+                "Network Failure",
+                None,
+                datetime.datetime.now(),
+            ]
+        except r.HTTPError:
+            logger.warning(
+                f"API error {resp.status_code} for {topic}/{indicator} on {geom_id}"
+            )
+            row_results = [
+                topic,
+                indicator,
+                resp.status_code,
+                -999,
+                resp.text,
+                None,
+                datetime.datetime.now(),
+            ]
 
-        row_results = extract_values_from_oqapi_response(resp)
         new_columns.append(row_results)
         logger.info(f"finished: {_ + 1}/{len(gdf)}")
 
@@ -70,6 +106,5 @@ def extract_values_from_oqapi_response(response):
         result["result"]["value"],
         result["result"]["description"],
         result["result"]["class"],
-        result["result"]["timestampOSM"]
+        result["result"]["timestampOSM"],
     ]
- 
