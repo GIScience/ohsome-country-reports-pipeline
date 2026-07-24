@@ -1,10 +1,15 @@
 import requests
 import dagster as dg
+import requests as r
 
 from osm_quality_pipeline.defs.constants import DATA_DIR
 
 from dagster_aws.s3 import S3Resource
 from dagster_duckdb_pandas import DuckDBPandasIOManager
+
+
+from osm_quality_pipeline.defs.utils.utils import handle_http_error, handle_timeout_error, handle_connection_error, extract_values_from_oqapi_response
+
 
 duckdb_io_manager = DuckDBPandasIOManager(
     database=f"{DATA_DIR}/asset_output.duckdb"
@@ -24,10 +29,30 @@ class OhsomeQualityApiResource(dg.ConfigurableResource):
     def base_url(self) -> str:
         return f"https://api.quality.ohsome.org/{self.api_version}"
 
-    def get_topics(self) -> list[str]:
-        resp = requests.get(f"{self.base_url}/metadata/topics")
-        resp.raise_for_status()
-        return list(resp.json()["result"].keys())
+    def query(self, indicator, topic, attribute, geojson_geometry, geom_id):
+        url = f"{self.base_url}/indicators/{indicator}"
+        headers = {"Accept": "application/json", "Content-Type": "application/json"}
+
+        params = {
+            "topic": topic,
+            "bpolys": geojson_geometry,
+        }
+
+        if indicator == "attribute-completeness":
+            params["attributes"] = [attribute]
+
+        try:
+            resp = r.post(url, json=params, headers=headers, timeout=120)
+            resp.raise_for_status()
+            row_results = extract_values_from_oqapi_response(resp)
+        except r.Timeout:
+            row_results = handle_timeout_error(geom_id, indicator, topic)
+        except r.ConnectionError:
+            row_results = handle_connection_error(geom_id, indicator, topic)
+        except r.HTTPError:
+            row_results = handle_http_error(geom_id, indicator, resp, topic)
+
+        return row_results
 
 
 @dg.definitions

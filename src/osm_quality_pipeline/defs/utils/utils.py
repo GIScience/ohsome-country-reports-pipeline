@@ -1,7 +1,11 @@
 import os
 import geopandas as gpd
 import pandas as pd
+import dagster as dg
+import datetime
 
+
+logger = dg.get_dagster_logger()
 
 def load_layer_as_gdf(context, country, layer):
     layer_path = os.path.join("data", country, f"{country}_{layer}.gpkg")
@@ -29,3 +33,62 @@ def empty_df(gdf, topic, indicator):
     df["quality_class"] = 0
     df["osm_timestamp"] = ""
     return df
+
+
+def handle_http_error(geom_id, indicator, resp, topic):
+    logger.warning(
+        f"API error {resp.status_code} for {topic}/{indicator} on {geom_id}"
+    )
+    row_results = [
+        topic,
+        indicator,
+        resp.status_code,
+        -999,
+        resp.text,
+        None,
+        datetime.datetime.now(),
+    ]
+    return row_results
+
+
+def handle_connection_error(geom_id, indicator, topic):
+    logger.warning(f"Network failure for {topic}/{indicator} on {geom_id}")
+    row_results = [
+        topic,
+        indicator,
+        998,
+        -999,
+        "Network Failure",
+        None,
+        datetime.datetime.now(),
+    ]
+    return row_results
+
+
+def handle_timeout_error(geom_id, indicator, topic):
+    logger.warning(f"Timeout for {topic}/{indicator} on {geom_id}")
+    row_results = [
+        topic,
+        indicator,
+        999,
+        -999,
+        "Timeout Error",
+        None,
+        datetime.datetime.now(),
+    ]
+    return row_results
+
+
+def extract_values_from_oqapi_response(response):
+    data = response.json()
+    result = data["result"][0]
+
+    return [
+        result["topic"]["name"],
+        result["metadata"]["name"],  # indicator name
+        response.status_code,
+        result["result"]["value"],
+        result["result"]["description"],
+        result["result"]["class"],
+        result["result"]["timestampOSM"],
+    ]

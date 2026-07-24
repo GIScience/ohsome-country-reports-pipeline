@@ -1,7 +1,4 @@
-import datetime
-
 import dagster as dg
-import requests as r
 import pandas as pd
 from typing import Tuple
 
@@ -10,37 +7,23 @@ from osm_quality_pipeline.defs.resources import OhsomeQualityApiResource
 logger = dg.get_dagster_logger()
 
 
+
 def oqapi_requests(gdf, topic, indicator, attribute=None):
     logger.info(f"start oqapi queries for: {topic}, {indicator}, {attribute}")
 
     new_columns = []
 
-    for _, row in gdf.iterrows():
-        geom_id = row["id"]
-        params = {
-            "topic": topic,
-            "bpolys": get_geojson_geometry(row),
-        }
+    for i, row in gdf.iterrows():
 
-        if indicator == "attribute-completeness":
-            params["attributes"] = [attribute]
 
-        ApiResource = OhsomeQualityApiResource()
-        headers = {"Accept": "application/json", "Content-Type": "application/json"}
-        url = f"{ApiResource.base_url}/indicators/{indicator}"
-        try:
-            resp = r.post(url, json=params, headers=headers, timeout=120)
-            resp.raise_for_status()
-            row_results = extract_values_from_oqapi_response(resp)
-        except r.Timeout:
-            row_results = handle_timeout_error(geom_id, indicator, row_results, topic)
-        except r.ConnectionError:
-            row_results = handle_connection_error(geom_id, indicator, row_results, topic)
-        except r.HTTPError:
-            row_results = handle_http_error(geom_id, indicator, resp, row_results, topic)
+        geojson_geometry = get_geojson_geometry(row)
 
+        ohsome_quality_api = OhsomeQualityApiResource()
+
+        row_results = ohsome_quality_api.query(indicator, topic, attribute, geojson_geometry, row["id"])
         new_columns.append(row_results)
-        logger.info(f"finished: {_ + 1}/{len(gdf)}")
+
+        logger.info(f"finished: {i + 1}/{len(gdf)}")
 
     df = populate_dataframe(gdf, indicator, new_columns, topic)
 
@@ -62,49 +45,6 @@ def get_geojson_geometry(row):
     }
 
 
-def handle_http_error(geom_id, indicator, resp, row_results, topic):
-    logger.warning(
-        f"API error {resp.status_code} for {topic}/{indicator} on {geom_id}"
-    )
-    row_results = [
-        topic,
-        indicator,
-        resp.status_code,
-        -999,
-        resp.text,
-        None,
-        datetime.datetime.now(),
-    ]
-    return row_results
-
-
-def handle_connection_error(geom_id, indicator, row_results, topic):
-    logger.warning(f"Network failure for {topic}/{indicator} on {geom_id}")
-    row_results = [
-        topic,
-        indicator,
-        998,
-        -999,
-        "Network Failure",
-        None,
-        datetime.datetime.now(),
-    ]
-    return row_results
-
-
-def handle_timeout_error(geom_id, indicator, row_results, topic):
-    logger.warning(f"Timeout for {topic}/{indicator} on {geom_id}")
-    row_results = [
-        topic,
-        indicator,
-        999,
-        -999,
-        "Timeout Error",
-        None,
-        datetime.datetime.now(),
-    ]
-    return row_results
-
 
 def populate_dataframe(gdf, indicator, new_columns, topic):
     # transform into a "normal" pandas df so that it can be stored in duckdb out of the box
@@ -118,21 +58,6 @@ def populate_dataframe(gdf, indicator, new_columns, topic):
     df["quality_class"] = [col[5] for col in new_columns]
     df["osm_timestamp"] = [col[6] for col in new_columns]
     return df
-
-
-def extract_values_from_oqapi_response(response):
-    data = response.json()
-    result = data["result"][0]
-
-    return [
-        result["topic"]["name"],
-        result["metadata"]["name"],  # indicator name
-        response.status_code,
-        result["result"]["value"],
-        result["result"]["description"],
-        result["result"]["class"],
-        result["result"]["timestampOSM"],
-    ]
 
 
 def validate_df(df) -> Tuple[pd.DataFrame, bool]:
