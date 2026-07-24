@@ -31,6 +31,6 @@ def land_cover_thematic_accuracy(context: dg.AssetExecutionContext,) -> pd.DataF
         logger.info(f"Indicator is only available for DEU. Can't process for {country}.")
         return empty_df(gdf, topic=TOPIC, indicator=INDICATOR)
 
-    df = oqapi_requests(gdf=gdf, topic=TOPIC, indicator=INDICATOR)
+    df, is_valid = oqapi_requests(gdf=gdf, topic=TOPIC, indicator=INDICATOR)
     df["value"] = df["value"].round(4)
     return df

@@ -32,6 +32,6 @@ def roads_thematic_accuracy(context: dg.AssetExecutionContext) -> pd.DataFrame:
         return empty_df(gdf, topic=TOPIC, indicator=INDICATOR)
 
 
-    df = oqapi_requests(gdf=gdf, topic=TOPIC, indicator=INDICATOR)
+    df, is_valid = oqapi_requests(gdf=gdf, topic=TOPIC, indicator=INDICATOR)
     df["value"] = df["value"].round(4)
     return df

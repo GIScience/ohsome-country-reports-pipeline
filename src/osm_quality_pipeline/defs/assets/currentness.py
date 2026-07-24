@@ -36,7 +36,7 @@ def make_currentness_asset(topic: str):
 
         gdf = load_layer_as_gdf(context, country, layer)
 
-        df = oqapi_requests(gdf=gdf, topic=topic, indicator=INDICATOR)
+        df, is_valid = oqapi_requests(gdf=gdf, topic=topic, indicator=INDICATOR)
         df["value"] = df["value"].round(4)
         return df
 
