@@ -28,7 +28,7 @@ def make_mapping_saturation_asset(topic: str):
     )
     def generic_mapping_saturation_asset(
         context: dg.AssetExecutionContext,
-    ) -> None:
+    ):
         f"""Mapping Saturation results as json for topic {topic}"""
 
         INDICATOR = "mapping-saturation"
@@ -41,12 +41,15 @@ def make_mapping_saturation_asset(topic: str):
 
         df = oqapi_requests(gdf=gdf, topic=topic, indicator=INDICATOR)
         #df["value"] = df["value"].round(4)
+
         df, is_valid = validate_df(df)
 
-        dg.MaterializeResult(
-            value=df,
-            metadata={"is_valid": is_valid}
+        # First, materialize dataframe into DuckDB
+        yield dg.MaterializeResult(
+            value=df
         )
+
+        # Then, fail asset of validation was not successful.
         if not is_valid:
             raise dg.Failure(description="Not all oqapi queries successful.")
 
@@ -60,4 +63,5 @@ all_mapping_saturation_assets = [
 
 
 def validate_df(df) -> Tuple[pd.DataFrame, bool]:
-    return [df,True]
+    is_valid = ~(df["status_code"] != 200).any()
+    return df, is_valid
