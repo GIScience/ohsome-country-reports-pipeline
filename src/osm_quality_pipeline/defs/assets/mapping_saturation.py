@@ -1,7 +1,5 @@
 import dagster as dg
-import pandas as pd
 
-from typing import Tuple
 from osm_quality_pipeline.defs.constants import TOPICS_BY_INDICATOR
 from osm_quality_pipeline.defs.partitions import (
     dynamic_country_layers_partition,
@@ -9,6 +7,7 @@ from osm_quality_pipeline.defs.partitions import (
 )
 from osm_quality_pipeline.defs.utils.oqapi import oqapi_requests
 from osm_quality_pipeline.defs.utils.utils import load_layer_as_gdf
+from osm_quality_pipeline.defs.utils.validation import validate_df
 
 logger = dg.get_dagster_logger()
 
@@ -60,8 +59,3 @@ all_mapping_saturation_assets = [
     make_mapping_saturation_asset(topic)
     for topic in TOPICS_BY_INDICATOR["mapping-saturation"]
 ]
-
-
-def validate_df(df) -> Tuple[pd.DataFrame, bool]:
-    is_valid = ~(df["status_code"] != 200).any()
-    return df, is_valid
