@@ -8,13 +8,15 @@ logger = dg.get_dagster_logger()
 
 
 
-def oqapi_requests(gdf, topic, indicator, attribute=None):
+def oqapi_requests(gdf, previous_results, topic, indicator, attribute=None):
     logger.info(f"start oqapi queries for: {topic}, {indicator}, {attribute}")
 
     new_columns = []
 
-    for i, row in gdf.iterrows():
+    # previous results are loaded earlier from duckb
+    print(previous_results)
 
+    for i, row in gdf.iterrows():
 
         geojson_geometry = get_geojson_geometry(row)
 

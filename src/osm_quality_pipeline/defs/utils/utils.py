@@ -1,4 +1,6 @@
 import os
+from importlib import import_module
+
 import geopandas as gpd
 import pandas as pd
 import dagster as dg
@@ -92,3 +94,15 @@ def extract_values_from_oqapi_response(response):
         result["result"]["class"],
         result["result"]["timestampOSM"],
     ]
+
+
+def load_existing_results_gdf(context, asset_name):
+    # try to load result from previous asset execution
+
+    defs = import_module("osm_quality_pipeline").definitions.defs()
+    df = defs.load_asset_value(asset_name, instance=context.instance)
+    gdf = gpd.GeoDataFrame(
+        df, geometry=gpd.GeoSeries.from_wkt(df.geometry), crs="EPSG:4326"
+    )
+    print(gdf)
+    return gdf
