@@ -1,6 +1,7 @@
 import dagster as dg
 import pandas as pd
 
+from typing import Tuple
 from osm_quality_pipeline.defs.constants import TOPICS_BY_INDICATOR
 from osm_quality_pipeline.defs.partitions import (
     dynamic_country_layers_partition,
@@ -27,7 +28,7 @@ def make_mapping_saturation_asset(topic: str):
     )
     def generic_mapping_saturation_asset(
         context: dg.AssetExecutionContext,
-    ) -> pd.DataFrame:
+    ) -> None:
         f"""Mapping Saturation results as json for topic {topic}"""
 
         INDICATOR = "mapping-saturation"
@@ -39,8 +40,15 @@ def make_mapping_saturation_asset(topic: str):
         gdf = load_layer_as_gdf(context, country, layer)
 
         df = oqapi_requests(gdf=gdf, topic=topic, indicator=INDICATOR)
-        df["value"] = df["value"].round(4)
-        return df
+        #df["value"] = df["value"].round(4)
+        df, is_valid = validate_df(df)
+
+        dg.MaterializeResult(
+            value=df,
+            metadata={"is_valid": is_valid}
+        )
+        if not is_valid:
+            raise dg.Failure(description="Not all oqapi queries successful.")
 
     return generic_mapping_saturation_asset
 
@@ -49,3 +57,7 @@ all_mapping_saturation_assets = [
     make_mapping_saturation_asset(topic)
     for topic in TOPICS_BY_INDICATOR["mapping-saturation"]
 ]
+
+
+def validate_df(df) -> Tuple[pd.DataFrame, bool]:
+    return [df,True]
