@@ -6,7 +6,7 @@ from osm_quality_pipeline.defs.partitions import (
     get_country_layer_from_partitionkey,
 )
 from osm_quality_pipeline.defs.utils.oqapi import oqapi_requests
-from osm_quality_pipeline.defs.utils.utils import load_layer_as_gdf, load_existing_results_gdf
+from osm_quality_pipeline.defs.utils.utils import load_layer_as_gdf
 
 logger = dg.get_dagster_logger()
 
@@ -31,28 +31,22 @@ def make_mapping_saturation_asset(topic: str):
 
         INDICATOR = "mapping-saturation"
 
-        country_layer = get_country_layer_from_partitionkey(context.partition_key)
+        partition_key = context.partition_key
+        country_layer = get_country_layer_from_partitionkey(partition_key)
         country = country_layer.country
         layer = country_layer.layer
 
         gdf = load_layer_as_gdf(context, country, layer)
 
-        # load previous results from duckdb
-        previous_df = load_existing_results_gdf(context, f"{topic_}_mapping_saturation")
-
-
-        df, is_valid = oqapi_requests(gdf=gdf, previous_results=previous_df, topic=topic, indicator=INDICATOR)
-        #df["value"] = df["value"].round(4)
+        df, is_valid = oqapi_requests(context, gdf, topic, partition_key, indicator=INDICATOR)
+        # df["value"] = df["value"].round(4)
 
         # First, materialize dataframe into DuckDB
-        yield dg.MaterializeResult(
-            value=df
-        )
+        yield dg.MaterializeResult(value=df)
 
         # Then, fail asset of validation was not successful.
         if not is_valid:
             raise dg.Failure(description="Not all oqapi queries successful.")
-
 
     return generic_mapping_saturation_asset
 

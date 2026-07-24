@@ -1,13 +1,16 @@
 import os
-from importlib import import_module
 
+import duckdb
 import geopandas as gpd
 import pandas as pd
 import dagster as dg
 import datetime
 
+from osm_quality_pipeline.defs.constants import DATA_DIR
+
 
 logger = dg.get_dagster_logger()
+
 
 def load_layer_as_gdf(context, country, layer):
     layer_path = os.path.join("data", country, f"{country}_{layer}.gpkg")
@@ -38,9 +41,7 @@ def empty_df(gdf, topic, indicator):
 
 
 def handle_http_error(geom_id, indicator, resp, topic):
-    logger.warning(
-        f"API error {resp.status_code} for {topic}/{indicator} on {geom_id}"
-    )
+    logger.warning(f"API error {resp.status_code} for {topic}/{indicator} on {geom_id}")
     row_results = [
         topic,
         indicator,
@@ -96,13 +97,29 @@ def extract_values_from_oqapi_response(response):
     ]
 
 
-def load_existing_results_gdf(context, asset_name):
-    # try to load result from previous asset execution
+def load_existing_results_gdf(asset_name, partition_key):
+    db_path = f"{DATA_DIR}/asset_output.duckdb"
+    if not os.path.exists(db_path):
+        logger.info(f"DuckDB file does not exist yet: {db_path}")
+        return None
 
-    defs = import_module("osm_quality_pipeline").definitions.defs()
-    df = defs.load_asset_value(asset_name, instance=context.instance)
-    gdf = gpd.GeoDataFrame(
-        df, geometry=gpd.GeoSeries.from_wkt(df.geometry), crs="EPSG:4326"
+    try:
+        conn = duckdb.connect(db_path, read_only=True)
+        df = conn.execute(f'SELECT * FROM public.{asset_name} WHERE partition_key = \'{partition_key}\'').fetchdf()
+        logger.info(f"Loaded {len(df)} existing rows from {asset_name} for partition_key: {partition_key}")
+        conn.close()
+        logger.info(f"Loaded {len(df)} existing rows from {asset_name}")
+        return df
+    except Exception as e:
+        logger.warning(f"Failed to read {asset_name} from DuckDB: {e}")
+        return None
+
+
+def get_retry_rows(df):
+    needs_retry = df["status_code"].isna() | (df["status_code"] != 200)
+    retry_df = df[needs_retry]
+    skip_df = df[~needs_retry]
+    logger.info(
+        f"Rows to retry: {len(retry_df)}, rows already successful: {len(skip_df)}"
     )
-    print(gdf)
-    return gdf
+    return retry_df, skip_df
