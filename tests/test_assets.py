@@ -36,6 +36,7 @@ def test_hexgrid_asset():
     shutil.rmtree(Path(result.value).parent)
 """
 
+# for the tests to work, you currently need to have the STP data in the data directory
 
 def test_oqapi_request_mapping_saturation():
     context = dg.build_asset_context(
