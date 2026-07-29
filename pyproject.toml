@@ -16,6 +16,7 @@ dependencies = [
     "dagster-aws>=0.28.4",
     "dagster-duckdb-pandas>=0.28.4",
     "pydantic-settings>=2.14.2",
+    "hdx-python-api>=6.6.8",
 ]
 
 [project.optional-dependencies]
