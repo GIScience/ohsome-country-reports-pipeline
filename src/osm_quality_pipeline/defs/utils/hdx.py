@@ -27,7 +27,7 @@ def get_s3_links(config, country, s3):
 def upload_to_hdx(country_code, links, context):
 
     Configuration.create(
-        hdx_site="stage",
+        hdx_site="stage", # works on "prod", stage not tested yet but should also work
         user_agent="HDXDataSeriesScript",
         hdx_key=os.getenv("HDX_KEY"),
         hdx_url="https://data.humdata.org/",

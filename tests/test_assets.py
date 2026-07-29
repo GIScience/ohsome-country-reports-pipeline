@@ -55,7 +55,7 @@ def test_oqapi_request_mapping_saturation():
 
     gdf = load_layer_as_gdf(context, country, layer)
 
-    df, is_valid = oqapi_requests(context, gdf, topic, partition_key, indicator=INDICATOR)
+    df, is_valid = oqapi_requests(gdf, topic, partition_key, indicator=INDICATOR)
     assert not df.empty
     assert df.iloc[0]["value"] == pytest.approx(1.0, 0.05)
 
