@@ -29,7 +29,7 @@ def building_comparison(
 
     gdf = load_layer_as_gdf(context, country, layer)
 
-    df, is_valid = oqapi_requests(gdf=gdf, topic=TOPIC, indicator=INDICATOR)
+    df, is_valid = oqapi_requests(gdf=gdf, topic=TOPIC, indicator=INDICATOR, partition_key=dynamic_country_layers_partition)
     df["value"] = df["value"].round(4)
     df["topic"] = "building-count" # give it the same topic name as others from the group to avoid confusion (should we do it like this???)
     return df

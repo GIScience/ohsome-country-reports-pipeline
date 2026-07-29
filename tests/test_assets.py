@@ -1,16 +1,15 @@
-#from osm_quality_pipeline.defs.assets import h3_hexgrid
 from osm_quality_pipeline.defs.assets.land_cover_completeness import land_cover_completeness
 from osm_quality_pipeline.defs.assets.mapping_saturation import make_mapping_saturation_asset
-from osm_quality_pipeline.defs.resources import OhsomeQualityApiResource
-import shutil
-from pathlib import Path
+from osm_quality_pipeline.defs.utils.oqapi import oqapi_requests
 import geopandas as gpd
 import dagster as dg
-import json
 import pytest
 import pandas as pd
 from pathlib import Path
 import pytest
+from osm_quality_pipeline.defs.partitions import get_country_layer_from_partitionkey
+from osm_quality_pipeline.defs.utils.utils import load_layer_as_gdf
+
 
 @pytest.fixture(autouse=True)
 def project_root_cwd(monkeypatch):
@@ -47,9 +46,16 @@ def test_oqapi_request_mapping_saturation():
             }
         )
     )
-    topic_key = "roads-all-highways"
-    saturation_asset = make_mapping_saturation_asset(topic_key)
-    df = saturation_asset(context)
+    topic = "roads-all-highways"
+    INDICATOR = "mapping-saturation"
+    partition_key = context.partition_key
+    country_layer = get_country_layer_from_partitionkey(partition_key)
+    country = country_layer.country
+    layer = country_layer.layer
+
+    gdf = load_layer_as_gdf(context, country, layer)
+
+    df, is_valid = oqapi_requests(context, gdf, topic, partition_key, indicator=INDICATOR)
     assert not df.empty
     assert df.iloc[0]["value"] == pytest.approx(1.0, 0.05)
 

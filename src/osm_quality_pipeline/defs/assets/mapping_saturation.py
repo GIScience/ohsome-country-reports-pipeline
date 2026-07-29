@@ -38,7 +38,7 @@ def make_mapping_saturation_asset(topic: str):
 
         gdf = load_layer_as_gdf(context, country, layer)
 
-        df, is_valid = oqapi_requests(context, gdf, topic, partition_key, indicator=INDICATOR)
+        df, is_valid = oqapi_requests(gdf, topic, partition_key, indicator=INDICATOR)
         # df["value"] = df["value"].round(4)
 
         # First, materialize dataframe into DuckDB

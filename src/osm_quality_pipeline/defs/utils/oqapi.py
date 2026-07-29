@@ -11,7 +11,7 @@ from osm_quality_pipeline.defs.utils.utils import (
 logger = dg.get_dagster_logger()
 
 
-def oqapi_requests(context, gdf, topic, partition_key, indicator, attribute=None):
+def oqapi_requests(gdf, topic, partition_key, indicator, attribute=None):
     asset_name = f"{topic.replace('-', '_')}_{indicator.replace('-', '_')}"
     if attribute:
         asset_name += f"_{attribute.replace('-', '_')}"

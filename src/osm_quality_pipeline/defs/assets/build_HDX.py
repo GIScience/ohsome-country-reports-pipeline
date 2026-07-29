@@ -9,7 +9,6 @@ logger = dg.get_dagster_logger()
 
 @dg.asset(partitions_def=country_partitions, group_name="uploads")
 def HDX_upload(context, config: S3Config, s3: S3Resource):
-    logger.info(config.bucket)
     country = context.partition_key
     links_list = get_s3_links(config, country, s3)
 
