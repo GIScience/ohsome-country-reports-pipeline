@@ -1,4 +1,3 @@
-import requests
 import dagster as dg
 import requests as r
 
@@ -9,16 +8,16 @@ from dagster_duckdb_pandas import DuckDBPandasIOManager
 
 
 from osm_quality_pipeline.defs.utils.utils import handle_http_error, handle_timeout_error, handle_connection_error, extract_values_from_oqapi_response
-
+from osm_quality_pipeline.defs.constants import CONFIG
 
 duckdb_io_manager = DuckDBPandasIOManager(
     database=f"{DATA_DIR}/asset_output.duckdb"
 )
 
 s3_resource = S3Resource(
-    aws_access_key_id=dg.EnvVar("S3_KEY_ID"),
-    aws_secret_access_key=dg.EnvVar("S3_SECRET"),
-    endpoint_url="https://" + dg.EnvVar("S3_HOST"),
+    aws_access_key_id=CONFIG.s3_config.key_id,
+    aws_secret_access_key=CONFIG.s3_config.secret,
+    endpoint_url=f"https://{CONFIG.s3_config.host}"
 )
 
 

@@ -3,6 +3,8 @@ import os
 import dagster as dg
 from pathlib import Path
 
+from pydantic_settings import BaseSettings
+
 H3_ZOOM_LEVEL = None
 
 REQUIRED_TOPICS = [
@@ -39,6 +41,13 @@ class BoundaryConfig(dg.Config):
 class ApiRequestConfig(dg.Config):
     max_workers: int = 5
     handle_500_as_na: bool = False
+
+class Config(BaseSettings):
+    s3_config: S3Config = S3Config()
+
+
+CONFIG = Config()
+
 
 
 REPO_ROOT = Path(__file__).parent.parent.parent.parent
