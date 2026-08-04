@@ -1,6 +1,7 @@
 import os
 
 import dagster as dg
+from hdx.api.configuration import Configuration
 from pathlib import Path
 
 from pydantic_settings import BaseSettings
@@ -30,6 +31,14 @@ class S3Config(dg.Config):
     bucket: str = os.getenv("S3_BUCKET")
 
 
+HDX_config = Configuration.create(
+    hdx_site="stage",  # works on "prod", stage not tested yet but should also work
+    user_agent="HDXDataSeriesScript",
+    hdx_key=os.getenv("HDX_KEY"),
+    hdx_url="https://data.humdata.org/",
+)
+
+
 class BoundaryConfig(dg.Config):
     bkg_boundary_url: str = (
         f"https://storage.heigit.org/heigit-hdx-public/oqapi_hdx/boundaries"
@@ -42,13 +51,12 @@ class ApiRequestConfig(dg.Config):
     max_workers: int = 5
     handle_500_as_na: bool = False
 
+
 class Config(BaseSettings):
     s3_config: S3Config = S3Config()
 
 
 CONFIG = Config()
-
-
 
 REPO_ROOT = Path(__file__).parent.parent.parent.parent
 DATA_DIR = REPO_ROOT / "data"
