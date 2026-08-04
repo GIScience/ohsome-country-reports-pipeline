@@ -18,7 +18,7 @@ def get_s3_links(config, country, s3):
     links_list = [
         (f"https://{config.host}/{config.bucket}/{obj['Key']}", obj["Key"].split("/")[-1],)
         for obj in response.get("Contents", [])
-        if obj["Key"].lower().endswith(".zip")
+        if obj["Key"].lower().endswith(".zip") # later change this to get gpkgs and csvs
     ]
     logger.info(links_list)
     return links_list
@@ -54,6 +54,9 @@ def create_country_dataset(country_code: str, country_name: str, links, context)
     dataset["maintainer"] = "valentin-boehmer-8808"
     dataset["maintainer_email"] = "valentin.boehmer@heigit.org"
     dataset["methodology"] = " Quality analysis of OSM data unsing the ohsome dashboard."
+    dataset.set_custom_viz(
+        f"https://giscience.github.io/osm-quality-country-reports/#/{country_code}/roads-all-highways"
+    )
     dataset["notes"] = (f"This dataset provides insights into the data quality of [OpenStreetMap](https://www.openstreetmap.org/) (OSM) data in {country_name}."
                         f" It has been created using the OSM data quality analysis of [ohsome](https://dashboard.ohsome.org/).\n\n"
                         f" Different indicators are used to asses the data quality depending on the selected topic, for further information regarding the calculation of the quality indicators see the [Github](https://github.com/GIScience/ohsome-quality-api) repository."
@@ -77,7 +80,7 @@ def create_country_dataset(country_code: str, country_name: str, links, context)
     try:
         dataset.add_country_location(country_code)
     except HDXError as e:
-        print(f"Warning: {e}")
+        context.log.info(f"Warning: {e}")
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
     dataset["dataset_date"] = f"[{today} TO {today}]"
