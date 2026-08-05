@@ -36,3 +36,16 @@ Use the command line to run the following command in the root of your Dagster pr
 dg dev
 ```
 Navigate to localhost:3000 in your browser.
+
+### helpful tip
+
+if you want to limit the amount of assets running at the same time, add the following to the config:
+
+![example_max_concurrent.png](example_max_concurrent.png)
+
+```sh
+execution:
+  config:
+    multiprocess:
+      max_concurrent: 4
+```
