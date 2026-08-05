@@ -4,6 +4,9 @@ import dagster as dg
 import geopandas as gpd
 import pandas as pd
 
+from osm_quality_pipeline.defs.resources import S3Resource
+from osm_quality_pipeline.defs.constants import CONFIG
+
 from osm_quality_pipeline.defs.constants import (
     ALL_TOPICS,
     STATIC_TOPIC_ASSETS,
@@ -34,7 +37,7 @@ ins = {dep: dg.AssetIn(key=dep) for dep in ALL_TOPIC_DEPS}
 
 @dg.asset(
     partitions_def=dynamic_country_layers_partition,
-    name="indicator_results_csv",
+    name="indicator_results_and_upload_csv",
     group_name="outputs",
     ins=ins
 )
@@ -56,11 +59,27 @@ def indicator_results_csv(context: dg.AssetExecutionContext, **kwargs) -> None:
 
     combined.to_csv(csv_path, encoding='utf-8', index=False)
 
+def upload_csv_to_s3(context: dg.AssetExecutionContext, s3: S3Resource) -> None:
+    s3_client = s3.get_client()
+
+    country_layer = get_country_layer_from_partitionkey(context.partition_key)
+    country_code = country_layer.country
+    layer = country_layer.layer
+
+    file_path = f"data/{country_code}/Outputs/{country_code}_{layer}_indicator_results.csv"
+
+    bucket_name = CONFIG.s3_config.bucket
+
+    s3_client.upload_file(
+        Filename=file_path,
+        Bucket=bucket_name,
+        Key=f"oqapi_hdx/downloads/{country_code}/{file_path}"
+    )
 
 
 @dg.asset(
     partitions_def=dynamic_country_layers_partition,
-    name="indicator_results_gpkg",
+    name="indicator_results_and_upload_gpkg",
     group_name="outputs",
     ins=ins
 )
@@ -111,3 +130,21 @@ def indicator_results_gpkg(context: dg.AssetExecutionContext, **kwargs) -> None:
         mode = "w" if first_layer else "a"
         wide_gdf.to_file(gpkg_path, layer=topic_, driver="GPKG", mode=mode)
         first_layer = False
+
+
+def upload_gpkg_to_s3(context: dg.AssetExecutionContext, s3: S3Resource) -> None:
+    s3_client = s3.get_client()
+
+    country_layer = get_country_layer_from_partitionkey(context.partition_key)
+    country_code = country_layer.country
+    layer = country_layer.layer
+
+    file_path = f"data/{country_code}/Outputs/{country_code}_{layer}_indicator_results.gpkg"
+
+    bucket_name = CONFIG.s3_config.bucket
+
+    s3_client.upload_file(
+        Filename=file_path,
+        Bucket=bucket_name,
+        Key=f"oqapi_hdx/downloads/{country_code}/{file_path}"
+    )
