@@ -33,12 +33,14 @@ class S3Config(dg.Config):
     bucket: str = os.getenv("S3_BUCKET")
 
 
-HDX_config = Configuration.create(
-    hdx_site="stage",  # works on "prod", stage not tested yet but should also work
-    user_agent="HDXDataSeriesScript",
-    hdx_key=os.getenv("HDX_KEY"),
-    hdx_url="https://data.humdata.org/",
-)
+def get_hdx_config():
+    hdx_config = Configuration.create(
+        hdx_site=os.getenv("HDX_SITE"),  # either "prod" or "stage" in .env
+        user_agent="HDXDataSeriesScript",
+        hdx_key=os.getenv("HDX_KEY"),
+        hdx_url="https://data.humdata.org/",
+    )
+    return hdx_config
 
 
 class BoundaryConfig(dg.Config):

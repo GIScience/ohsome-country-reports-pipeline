@@ -1,6 +1,6 @@
 import dagster as dg
 import yaml
-from osm_quality_pipeline.defs.constants import HDX_config
+from osm_quality_pipeline.defs.constants import get_hdx_config
 from hdx.data.dataset import Dataset
 from hdx.data.hdxobject import HDXError
 from datetime import datetime, timezone
@@ -33,6 +33,7 @@ def upload_to_hdx(country_code, links, context):
 
 
 def create_country_dataset(country_code: str, country_name: str, links, context):
+    config = get_hdx_config()
     dataset_name = f"{country_name} OSM Data quality"
     title = f"{country_name} - OSM Data quality"
 
