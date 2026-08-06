@@ -21,7 +21,7 @@ def country_layers(context, config: BoundaryConfig) -> dg.MaterializeResult[list
     old_partitions = context.instance.get_dynamic_partitions("dynamic_country_layers")
     logger.info(f"existing partitions: {old_partitions}")
 
-    out_dir = os.path.join("data", country)
+    out_dir = os.path.join(DATA_DIR, country)
     os.makedirs(out_dir, exist_ok=True)
 
     if country == "DEU":
