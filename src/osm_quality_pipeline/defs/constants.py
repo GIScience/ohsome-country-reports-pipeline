@@ -62,8 +62,7 @@ class Config(BaseSettings):
 
 CONFIG = Config()
 
-REPO_ROOT = Path(__file__).parent.parent.parent.parent
-DATA_DIR = REPO_ROOT / "data"
+DATA_DIR = Path(os.getenv("DAGSTER_DATA_DIR"))
 
 TOPICS_BY_INDICATOR = {
     "currentness": ["building-count", "roads", "land-cover", "schools", "hospitals"],
