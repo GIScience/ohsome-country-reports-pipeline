@@ -4,6 +4,9 @@
 
 Make sure that you set the `DAGSTER_HOME` in an `.env` file like it's done in `.example.env`.
 
+Make sure that you set the `DAGSTER_DATA_DIR` in an `.env` file like it's done in `.example.env`. 
+You can specify any path.
+
 
 ### uv
 If you do not have uv installed, you can do so in a [number of ways](https://docs.astral.sh/uv/getting-started/installation/). To install the python dependencies with uv. While in the course specific directory run the following:
