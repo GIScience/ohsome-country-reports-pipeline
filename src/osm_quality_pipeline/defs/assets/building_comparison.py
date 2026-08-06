@@ -3,7 +3,7 @@ import pandas as pd
 
 from osm_quality_pipeline.defs.partitions import dynamic_country_layers_partition, get_country_layer_from_partitionkey
 from osm_quality_pipeline.defs.utils.oqapi import oqapi_requests
-from osm_quality_pipeline.defs.utils.utils import load_layer_as_gdf
+from osm_quality_pipeline.defs.utils.utils import load_layer_as_gdf, empty_df
 
 logger = dg.get_dagster_logger()
 
@@ -28,6 +28,10 @@ def building_comparison(
     layer = country_layer.layer
 
     gdf = load_layer_as_gdf(context, country, layer)
+
+    if country != "DEU":
+        logger.info(f"Indicator is only available for DEU. Can't process for {country}.")
+        return empty_df(gdf, topic=TOPIC, indicator=INDICATOR)
 
     df, is_valid = oqapi_requests(gdf=gdf, topic=TOPIC, indicator=INDICATOR, partition_key=dynamic_country_layers_partition)
     df["value"] = df["value"].round(4)

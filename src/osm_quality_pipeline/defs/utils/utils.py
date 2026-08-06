@@ -85,7 +85,7 @@ def handle_timeout_error(geom_id, indicator, topic):
 def extract_values_from_oqapi_response(response):
     data = response.json()
     result = data["result"][0]
-    result["value"] = ["value"].round(4)
+    result["result"]["value"] = round(result["result"]["value"], 4)
 
     return [
         result["topic"]["name"],
