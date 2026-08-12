@@ -12,7 +12,6 @@ services:
       S3_SECRET: "$S3_SECRET"
       S3_HOST: "$S3_HOST"
       S3_BUCKET: "$S3_BUCKET"
-      S3_SSL:  "$S3_SSL"
     command: uv run dagster dev -h 0.0.0.0 --port $DAGSTER_PORT
 
 volumes:
