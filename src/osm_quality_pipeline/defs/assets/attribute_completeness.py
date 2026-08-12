@@ -54,7 +54,7 @@ def make_attribute_completeness_asset(topic: str):
         yield dg.MaterializeResult(value=df_merged)
 
         # Then, fail asset of validation was not successful.
-        if not all(is_valid):
+        if not all(is_valid_list):
             raise dg.Failure(description="Not all oqapi queries successful.")
 
     return generic_attribute_completeness_asset
