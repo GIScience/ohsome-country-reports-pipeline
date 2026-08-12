@@ -44,7 +44,8 @@ def country_layers_geoboundaries(context, config, country, out_dir):
             url_val="gjDownloadURL",
             out_dir=out_dir,
         )
-    adm0_boundary_path = os.path.join("data", country, f"{country}_adm0.gpkg")
+
+    adm0_boundary_path = os.path.join(DATA_DIR, country, f"{country}_adm0.gpkg")
     
     create_h3_layer(country, adm0_boundary_path, out_dir)
     logger.info(f"generated h3 layer for {country}")

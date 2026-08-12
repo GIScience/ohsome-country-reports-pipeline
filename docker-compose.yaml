@@ -1,0 +1,19 @@
+services:
+  osm-country-reports:
+    build: .
+    volumes:
+      - dagster-osm-country-reports:/data/dagster
+    ports:
+      - "$DAGSTER_PORT:$DAGSTER_PORT"
+    environment:
+      DAGSTER_HOME: "/data/dagster/home"
+      DAGSTER_DATA_DIR: "/data/dagster/data"
+      S3_KEY_ID: "$S3_KEY_ID"
+      S3_SECRET: "$S3_SECRET"
+      S3_HOST: "$S3_HOST"
+      S3_BUCKET: "$S3_BUCKET"
+      S3_SSL:  "$S3_SSL"
+    command: uv run dagster dev -h 0.0.0.0 --port $DAGSTER_PORT
+
+volumes:
+  dagster-osm-country-reports:
