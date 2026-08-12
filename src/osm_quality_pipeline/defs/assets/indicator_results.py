@@ -79,7 +79,6 @@ def indicator_results_gpkg_s3(context: dg.AssetExecutionContext, s3: S3Resource,
 
     gpkg_path = f"{DATA_DIR}/{country_code}/{country_code}_{layer}_indicator_results.gpkg"
 
-    first_layer = True
     for topic in ALL_TOPICS:
         topic_gdf = combined[combined["topic"] == topic]
         if topic_gdf.empty:
@@ -96,7 +95,7 @@ def indicator_results_gpkg_s3(context: dg.AssetExecutionContext, s3: S3Resource,
         wide = topic_gdf.pivot(
             index="id",
             columns="indicator_key",
-            values=["value", "description"]
+            values=["value", "description", "quality_class"]
         )
         wide.columns = wide.columns.swaplevel(0, 1)
         wide = wide.sort_index(axis=1, level=0)
@@ -108,9 +107,8 @@ def indicator_results_gpkg_s3(context: dg.AssetExecutionContext, s3: S3Resource,
         wide = wide.merge(geom_map, on="id", how="left")
 
         wide_gdf = gpd.GeoDataFrame(wide, geometry="geometry", crs="EPSG:4326")
-        mode = "w" if first_layer else "a"
-        wide_gdf.to_file(gpkg_path, layer=topic_, driver="GPKG", mode=mode)
-        first_layer = False
+        wide_gdf.to_file(gpkg_path, layer=topic_, driver="GPKG", mode="w")
+        
 
     upload_file_to_s3(gpkg_path, country_code, s3)
 
