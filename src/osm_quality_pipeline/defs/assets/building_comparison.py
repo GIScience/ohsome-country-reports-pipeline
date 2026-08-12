@@ -19,7 +19,7 @@ logger = dg.get_dagster_logger()
 )
 def building_comparison(
         context: dg.AssetExecutionContext,
-) -> pd.DataFrame:
+):
     INDICATOR = "building-comparison"
     TOPIC = "building-area"
 
@@ -34,6 +34,13 @@ def building_comparison(
         return empty_df(gdf, topic=TOPIC, indicator=INDICATOR)
 
     df, is_valid = oqapi_requests(gdf=gdf, topic=TOPIC, indicator=INDICATOR, partition_key=dynamic_country_layers_partition)
-    df["value"] = df["value"].round(4)
+
     df["topic"] = "building-count" # give it the same topic name as others from the group to avoid confusion (should we do it like this???)
-    return df
+
+    # First, materialize dataframe into DuckDB
+    yield dg.MaterializeResult(value=df)
+
+    # Then, fail asset of validation was not successful.
+    if not is_valid:
+        raise dg.Failure(description="Not all oqapi queries successful.")
+

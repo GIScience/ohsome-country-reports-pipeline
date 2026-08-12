@@ -16,7 +16,7 @@ logger = dg.get_dagster_logger()
     },
     io_manager_key="duckdb_io_manager"
 )
-def land_cover_thematic_accuracy(context: dg.AssetExecutionContext,) -> pd.DataFrame:
+def land_cover_thematic_accuracy(context: dg.AssetExecutionContext):
 
     INDICATOR = "land-cover-thematic-accuracy"
     TOPIC = "land-cover"
@@ -32,4 +32,10 @@ def land_cover_thematic_accuracy(context: dg.AssetExecutionContext,) -> pd.DataF
         return empty_df(gdf, topic=TOPIC, indicator=INDICATOR)
 
     df, is_valid = oqapi_requests(gdf=gdf, topic=TOPIC, indicator=INDICATOR, partition_key=dynamic_country_layers_partition)
-    return df
+
+    # First, materialize dataframe into DuckDB
+    yield dg.MaterializeResult(value=df)
+
+    # Then, fail asset of validation was not successful.
+    if not is_valid:
+        raise dg.Failure(description="Not all oqapi queries successful.")

@@ -39,14 +39,23 @@ def make_attribute_completeness_asset(topic: str):
         gdf = load_layer_as_gdf(context, country, layer)
 
         df_list = []
+        is_valid_list = []
         for attribute in TOPIC_ATTRIBUTES[topic]:
             df, is_valid = oqapi_requests(
                 gdf=gdf.copy(), topic=topic, indicator=INDICATOR, attribute=attribute, partition_key=dynamic_country_layers_partition
             )
             df["attribute"] = attribute
             df_list.append(df)
+            is_valid_list.append(is_valid)
 
-        return pd.concat(df_list)
+        df_merged = pd.concat(df_list)
+
+        # First, materialize dataframe into DuckDB
+        yield dg.MaterializeResult(value=df_merged)
+
+        # Then, fail asset of validation was not successful.
+        if not all(is_valid):
+            raise dg.Failure(description="Not all oqapi queries successful.")
 
     return generic_attribute_completeness_asset
 

@@ -37,7 +37,13 @@ def make_user_activity_asset(topic: str):
         gdf = load_layer_as_gdf(context, country, layer)
 
         df, is_valid = oqapi_requests(gdf=gdf, topic=topic, indicator=INDICATOR, partition_key=dynamic_country_layers_partition)
-        return df
+
+        # First, materialize dataframe into DuckDB
+        yield dg.MaterializeResult(value=df)
+
+        # Then, fail asset of validation was not successful.
+        if not is_valid:
+            raise dg.Failure(description="Not all oqapi queries successful.")
 
     return generic_user_activity_asset
 
