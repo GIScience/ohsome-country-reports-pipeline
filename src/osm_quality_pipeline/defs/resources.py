@@ -8,7 +8,7 @@ from dagster_duckdb_pandas import DuckDBPandasIOManager
 
 
 from osm_quality_pipeline.defs.utils.utils import handle_http_error, handle_timeout_error, handle_connection_error, extract_values_from_oqapi_response
-from osm_quality_pipeline.defs.constants import CONFIG
+from osm_quality_pipeline.defs.constants import CONFIG, OHSOME_QUALITY_API_URL, OHSOME_API_KEY
 
 duckdb_io_manager = DuckDBPandasIOManager(
     database=f"{DATA_DIR}/asset_output.duckdb"
@@ -22,15 +22,18 @@ s3_resource = S3Resource(
 
 
 class OhsomeQualityApiResource(dg.ConfigurableResource):
-    api_version: str = "v1-test"
 
     @property
     def base_url(self) -> str:
-        return f"https://api.quality.ohsome.org/{self.api_version}"
+        return OHSOME_QUALITY_API_URL
 
     def query(self, indicator, topic, attribute, geojson_geometry, geom_id):
         url = f"{self.base_url}/indicators/{indicator}"
-        headers = {"Accept": "application/json", "Content-Type": "application/json"}
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "Authorization": OHSOME_API_KEY
+        }
 
         params = {
             "topic": topic,
