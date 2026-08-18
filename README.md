@@ -52,3 +52,11 @@ execution:
     multiprocess:
       max_concurrent: 4
 ```
+
+
+Another way to limit concurrent requests:
+
+* start your dagster instance, e.g. `uv run dg dev`
+* run this command and adjust the value (i.e `3`) for the number of paralle ohsome quality API requests:
+* `uv run dagster instance concurrency set ohsome_quality_api 3`
+

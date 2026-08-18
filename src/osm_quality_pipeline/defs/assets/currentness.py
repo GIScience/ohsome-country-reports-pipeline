@@ -24,6 +24,7 @@ def make_currentness_asset(topic: str):
             "partition_expr": "partition_key"  # DuckDB maps partitions to the 'partition_key' column
         },
         io_manager_key="duckdb_io_manager",
+        pool="ohsome_quality_api"
     )
     def generic_currentness_asset(context: dg.AssetExecutionContext):
         f"""Mapping Saturation results as json for topic {topic}"""

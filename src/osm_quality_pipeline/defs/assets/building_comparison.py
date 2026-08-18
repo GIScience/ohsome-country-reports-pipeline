@@ -15,7 +15,8 @@ logger = dg.get_dagster_logger()
     metadata={
         "partition_expr": "partition_key"  # DuckDB maps partitions to the 'partition_key' column
     },
-    io_manager_key="duckdb_io_manager"
+    io_manager_key="duckdb_io_manager",
+    pool="ohsome_quality_api"
 )
 def building_comparison(
         context: dg.AssetExecutionContext,
@@ -31,11 +32,11 @@ def building_comparison(
 
     if country != "DEU":
         logger.info(f"Indicator is only available for DEU. Can't process for {country}.")
-        return empty_df(gdf, topic=TOPIC, indicator=INDICATOR)
-
-    df, is_valid = oqapi_requests(gdf=gdf, topic=TOPIC, indicator=INDICATOR, partition_key=dynamic_country_layers_partition)
-
-    df["topic"] = "building-count" # give it the same topic name as others from the group to avoid confusion (should we do it like this???)
+        df = empty_df(gdf, topic=TOPIC, indicator=INDICATOR)
+        is_valid = True
+    else:
+        df, is_valid = oqapi_requests(gdf=gdf, topic=TOPIC, indicator=INDICATOR, partition_key=dynamic_country_layers_partition)
+        df["topic"] = "building-count" # give it the same topic name as others from the group to avoid confusion (should we do it like this???)
 
     # First, materialize dataframe into DuckDB
     yield dg.MaterializeResult(value=df)

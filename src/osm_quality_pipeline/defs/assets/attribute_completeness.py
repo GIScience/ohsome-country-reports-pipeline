@@ -24,6 +24,7 @@ def make_attribute_completeness_asset(topic: str):
             "partition_expr": "partition_key"  # DuckDB maps partitions to the 'partition_key' column
         },
         io_manager_key="duckdb_io_manager",
+        pool="ohsome_quality_api"
     )
     def generic_attribute_completeness_asset(
         context: dg.AssetExecutionContext,
