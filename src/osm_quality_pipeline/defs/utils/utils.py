@@ -16,6 +16,8 @@ def load_layer_as_gdf(context, country, layer):
     layer_path = os.path.join(DATA_DIR, country, f"{country}_{layer}.gpkg")
     gdf = gpd.read_file(layer_path)
 
+    gdf.geometry = gdf.geometry.simplify(0.002)
+
     # drop all columns, but id and geometry
     columns = list(gdf.columns)
     columns.remove("id")
