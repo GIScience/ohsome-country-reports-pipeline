@@ -98,7 +98,8 @@ def extract_values_from_oqapi_response(response):
         result["result"]["value"],
         result["result"]["description"],
         result["result"]["class"],
-        result["result"]["timestampOSM"]
+        result["result"]["timestampOSM"],
+        result["result"]["figure"]
     ]
 
 

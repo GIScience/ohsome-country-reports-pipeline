@@ -81,6 +81,7 @@ def build_dataframe(gdf, indicator, new_columns, topic):
     df["description"] = [col[4] for col in new_columns]
     df["quality_class"] = [col[5] for col in new_columns]
     df["osm_timestamp"] = [col[6] for col in new_columns]
+    df["figure"] = [col[7] for col in new_columns]
     return df
 
 
