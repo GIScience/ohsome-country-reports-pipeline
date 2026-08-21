@@ -4,6 +4,7 @@ import requests as r
 from osm_quality_pipeline.defs.constants import DATA_DIR
 
 from dagster_aws.s3 import S3Resource
+from dagster_duckdb import DuckDBResource
 from dagster_duckdb_pandas import DuckDBPandasIOManager
 
 
@@ -18,6 +19,30 @@ s3_resource = S3Resource(
     aws_access_key_id=CONFIG.s3_config.key_id,
     aws_secret_access_key=CONFIG.s3_config.secret,
     endpoint_url=f"https://{CONFIG.s3_config.host}"
+)
+
+
+class CustomDuckDBResource(DuckDBResource):
+    def query_asset_results_df(self, partition_key, topic, indicator, attribute):
+
+        topic_name = topic.replace('-', '_')
+        indicator_name = indicator.replace('-', '_')
+
+        if attribute:
+            attribute_name = attribute.replace('-', '_')
+            table_name = f"{topic_name}_{indicator_name}_{attribute_name}"
+        else:
+            table_name = f"{topic_name}_{indicator_name}"
+
+        with self.get_connection() as conn:
+            df = conn.execute(
+                f"SELECT * FROM public.{table_name} WHERE partition_key = '{partition_key}'"
+            ).fetchdf()
+            return df
+
+
+duckdb_resource = CustomDuckDBResource(
+    database=f"{DATA_DIR}/asset_output.duckdb"
 )
 
 
@@ -63,6 +88,7 @@ def resources() -> dg.Definitions:
         resources={
             "ohsome_api": OhsomeQualityApiResource(api_version="v1-test"),
             "s3": s3_resource,
-            "duckdb_io_manager": duckdb_io_manager
+            "duckdb_io_manager": duckdb_io_manager,
+            "duckdb": duckdb_resource
         }
     )

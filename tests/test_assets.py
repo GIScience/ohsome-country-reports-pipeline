@@ -1,10 +1,7 @@
 from osm_quality_pipeline.defs.assets.land_cover_completeness import land_cover_completeness
-from osm_quality_pipeline.defs.assets.mapping_saturation import make_mapping_saturation_asset
-from osm_quality_pipeline.defs.utils.oqapi import oqapi_requests
-import geopandas as gpd
+from osm_quality_pipeline.defs.resources import CustomDuckDBResource
+from osm_quality_pipeline.defs.utils.ohsome_quality_api import ohsome_quality_api_requests
 import dagster as dg
-import pytest
-import pandas as pd
 from pathlib import Path
 import pytest
 from osm_quality_pipeline.defs.partitions import get_country_layer_from_partitionkey
@@ -53,9 +50,11 @@ def test_oqapi_request_mapping_saturation():
     country = country_layer.country
     layer = country_layer.layer
 
+    duckdb = CustomDuckDBResource()
+
     gdf = load_layer_as_gdf(context, country, layer)
 
-    df, is_valid = oqapi_requests(gdf, topic, partition_key, indicator=INDICATOR)
+    df, is_valid = ohsome_quality_api_requests(duckdb, gdf, topic, partition_key, indicator=INDICATOR)
     assert not df.empty
     assert df.iloc[0]["value"] == pytest.approx(1.0, 0.05)
 

@@ -5,7 +5,8 @@ from osm_quality_pipeline.defs.partitions import (
     dynamic_country_layers_partition,
     get_country_layer_from_partitionkey,
 )
-from osm_quality_pipeline.defs.utils.oqapi import oqapi_requests
+from osm_quality_pipeline.defs.resources import CustomDuckDBResource
+from osm_quality_pipeline.defs.utils.ohsome_quality_api import ohsome_quality_api_requests
 from osm_quality_pipeline.defs.utils.utils import load_layer_as_gdf
 
 logger = dg.get_dagster_logger()
@@ -27,6 +28,7 @@ def make_mapping_saturation_asset(topic: str):
     )
     def generic_mapping_saturation_asset(
         context: dg.AssetExecutionContext,
+        duckdb: CustomDuckDBResource
     ):
         f"""Mapping Saturation results as json for topic {topic}"""
 
@@ -39,8 +41,13 @@ def make_mapping_saturation_asset(topic: str):
 
         gdf = load_layer_as_gdf(context, country, layer)
 
-        df, is_valid = oqapi_requests(gdf, topic, partition_key, indicator=INDICATOR)
-        # df["value"] = df["value"].round(4)
+        df, is_valid = ohsome_quality_api_requests(
+            duckdb=duckdb,
+            gdf=gdf,
+            topic=topic,
+            indicator=INDICATOR,
+            partition_key=context.partition_key
+        )
 
         # First, materialize dataframe into DuckDB
         yield dg.MaterializeResult(value=df)

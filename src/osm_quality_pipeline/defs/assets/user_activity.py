@@ -6,7 +6,8 @@ from osm_quality_pipeline.defs.partitions import (
     dynamic_country_layers_partition,
     get_country_layer_from_partitionkey,
 )
-from osm_quality_pipeline.defs.utils.oqapi import oqapi_requests
+from osm_quality_pipeline.defs.resources import CustomDuckDBResource
+from osm_quality_pipeline.defs.utils.ohsome_quality_api import ohsome_quality_api_requests
 from osm_quality_pipeline.defs.utils.utils import load_layer_as_gdf
 
 logger = dg.get_dagster_logger()
@@ -26,7 +27,7 @@ def make_user_activity_asset(topic: str):
         io_manager_key="duckdb_io_manager",
         pool="ohsome_quality_api"
     )
-    def generic_user_activity_asset(context: dg.AssetExecutionContext) -> pd.DataFrame:
+    def generic_user_activity_asset(context: dg.AssetExecutionContext, duckdb: CustomDuckDBResource) -> pd.DataFrame:
         f"""User activity results as json for topic {topic}"""
 
         INDICATOR = "user-activity"
@@ -37,7 +38,13 @@ def make_user_activity_asset(topic: str):
 
         gdf = load_layer_as_gdf(context, country, layer)
 
-        df, is_valid = oqapi_requests(gdf=gdf, topic=topic, indicator=INDICATOR, partition_key=dynamic_country_layers_partition)
+        df, is_valid = ohsome_quality_api_requests(
+            duckdb=duckdb,
+            gdf=gdf,
+            topic=topic,
+            indicator=INDICATOR,
+            partition_key=context.partition_key
+        )
 
         # First, materialize dataframe into DuckDB
         yield dg.MaterializeResult(value=df)

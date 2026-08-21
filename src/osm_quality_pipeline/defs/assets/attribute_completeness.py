@@ -6,7 +6,8 @@ from osm_quality_pipeline.defs.partitions import (
     dynamic_country_layers_partition,
     get_country_layer_from_partitionkey,
 )
-from osm_quality_pipeline.defs.utils.oqapi import oqapi_requests
+from osm_quality_pipeline.defs.resources import CustomDuckDBResource
+from osm_quality_pipeline.defs.utils.ohsome_quality_api import ohsome_quality_api_requests
 from osm_quality_pipeline.defs.utils.utils import load_layer_as_gdf
 
 logger = dg.get_dagster_logger()
@@ -28,6 +29,7 @@ def make_attribute_completeness_asset(topic: str):
     )
     def generic_attribute_completeness_asset(
         context: dg.AssetExecutionContext,
+        duckdb: CustomDuckDBResource
     ) -> pd.DataFrame:
         f"""Attribute completeness results as json for topic {topic}"""
 
@@ -42,8 +44,12 @@ def make_attribute_completeness_asset(topic: str):
         df_list = []
         is_valid_list = []
         for attribute in TOPIC_ATTRIBUTES[topic]:
-            df, is_valid = oqapi_requests(
-                gdf=gdf.copy(), topic=topic, indicator=INDICATOR, attribute=attribute, partition_key=dynamic_country_layers_partition
+            df, is_valid = ohsome_quality_api_requests(
+                duckdb=duckdb,
+                gdf=gdf,
+                topic=topic,
+                indicator=INDICATOR,
+                partition_key=context.partition_key
             )
             df["attribute"] = attribute
             df_list.append(df)

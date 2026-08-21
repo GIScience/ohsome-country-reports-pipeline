@@ -98,7 +98,7 @@ ALL_TOPICS = sorted(
 )
 
 API_TOPIC_NAMES = {
-    "buildings": "Buildings (count)",
+    "buildings": "Buildings",
     "hospitals": "Hospitals",
     "land-cover": "Land Use and Land Cover",
     "roads": "Roads (cars)",

@@ -107,24 +107,6 @@ def extract_values_from_oqapi_response(response):
     ]
 
 
-def load_existing_results_gdf(asset_name, partition_key):
-    db_path = f"{DATA_DIR}/asset_output.duckdb"
-    if not os.path.exists(db_path):
-        logger.info(f"DuckDB file does not exist yet: {db_path}")
-        return None
-
-    try:
-        conn = duckdb.connect(db_path, read_only=True)
-        df = conn.execute(f'SELECT * FROM public.{asset_name} WHERE partition_key = \'{partition_key}\'').fetchdf()
-        logger.info(f"Loaded {len(df)} existing rows from {asset_name} for partition_key: {partition_key}")
-        conn.close()
-        logger.info(f"Loaded {len(df)} existing rows from {asset_name}")
-        return df
-    except Exception as e:
-        logger.warning(f"Failed to read {asset_name} from DuckDB: {e}")
-        return None
-
-
 def get_retry_rows(df):
     needs_retry = df["status_code"].isna() | (df["status_code"] != 200)
     retry_df = df[needs_retry]

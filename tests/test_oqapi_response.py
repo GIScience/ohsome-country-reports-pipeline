@@ -5,7 +5,9 @@ import geopandas as gpd
 import pytest
 from shapely.geometry import box
 
-from osm_quality_pipeline.defs.utils.oqapi import oqapi_requests
+from osm_quality_pipeline.defs.utils.oqapi import ohsome_quality_api_requests
+
+from osm_quality_pipeline.defs.resources import CustomDuckDBResource
 
 
 @pytest.fixture
@@ -88,8 +90,10 @@ def _make_http_error_result():
 
 def test_success(sample_gdf, mock_context, mock_api_resource, mock_load_existing):
     mock_api_resource.return_value.query.return_value = _make_success_query_result()
+    duckdb = CustomDuckDBResource()
 
-    df, is_valid = oqapi_requests(
+    df, is_valid = ohsome_quality_api_requests(
+        duckdb,
         mock_context,
         sample_gdf,
         topic="roads",
@@ -107,8 +111,10 @@ def test_success(sample_gdf, mock_context, mock_api_resource, mock_load_existing
 
 def test_timeout(sample_gdf, mock_context, mock_api_resource, mock_load_existing):
     mock_api_resource.return_value.query.return_value = _make_timeout_query_result()
+    duckdb = CustomDuckDBResource()
 
-    df, is_valid = oqapi_requests(
+    df, is_valid = ohsome_quality_api_requests(
+        duckdb,
         mock_context,
         sample_gdf,
         topic="roads",
@@ -126,8 +132,10 @@ def test_timeout(sample_gdf, mock_context, mock_api_resource, mock_load_existing
 
 def test_network_error(sample_gdf, mock_context, mock_api_resource, mock_load_existing):
     mock_api_resource.return_value.query.return_value = _make_connection_error_result()
+    duckdb = CustomDuckDBResource()
 
-    df, is_valid = oqapi_requests(
+    df, is_valid = ohsome_quality_api_requests(
+        duckdb,
         mock_context,
         sample_gdf,
         topic="roads",
@@ -145,8 +153,10 @@ def test_network_error(sample_gdf, mock_context, mock_api_resource, mock_load_ex
 
 def test_http_error(sample_gdf, mock_context, mock_api_resource, mock_load_existing):
     mock_api_resource.return_value.query.return_value = _make_http_error_result()
+    duckdb = CustomDuckDBResource()
 
-    df, is_valid = oqapi_requests(
+    df, is_valid = ohsome_quality_api_requests(
+        duckdb,
         mock_context,
         sample_gdf,
         topic="roads",
