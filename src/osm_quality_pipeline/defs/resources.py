@@ -22,23 +22,45 @@ s3_resource = S3Resource(
 )
 
 
+def build_table_name(topic, indicator, attribute):
+
+    topic_name = topic.replace('-', '_')
+    indicator_name = indicator.replace('-', '_')
+    if attribute:
+        attribute_name = attribute.replace('-', '_')
+        table_name = f"{topic_name}_{indicator_name}_{attribute_name}"
+    else:
+        table_name = f"{topic_name}_{indicator_name}"
+
+    return table_name
+
+
 class CustomDuckDBResource(DuckDBResource):
+
     def query_asset_results_df(self, partition_key, topic, indicator, attribute):
-
-        topic_name = topic.replace('-', '_')
-        indicator_name = indicator.replace('-', '_')
-
-        if attribute:
-            attribute_name = attribute.replace('-', '_')
-            table_name = f"{topic_name}_{indicator_name}_{attribute_name}"
-        else:
-            table_name = f"{topic_name}_{indicator_name}"
-
+        table_name = build_table_name(topic, indicator, attribute)
         with self.get_connection() as conn:
             df = conn.execute(
                 f"SELECT * FROM public.{table_name} WHERE partition_key = '{partition_key}'"
             ).fetchdf()
             return df
+
+    def check_if_table_exists(self, topic, indicator, attribute):
+        table_name = build_table_name(topic, indicator, attribute)
+        with self.get_connection() as conn:
+            count = conn.execute(
+                f"SELECT COUNT(*) FROM information_schema.tables WHERE table_name = '{table_name}'"
+            ).fetchone()
+
+            print(count)
+
+            if count == 1:
+                table_exists = True
+            else:
+                table_exists = False
+
+            return table_name, table_exists
+
 
 
 duckdb_resource = CustomDuckDBResource(
@@ -81,12 +103,13 @@ class OhsomeQualityApiResource(dg.ConfigurableResource):
 
         return row_results
 
+ohsome_quality_api = OhsomeQualityApiResource()
 
 @dg.definitions
 def resources() -> dg.Definitions:
     return dg.Definitions(
         resources={
-            "ohsome_api": OhsomeQualityApiResource(api_version="v1-test"),
+            "ohsome_api": ohsome_quality_api,
             "s3": s3_resource,
             "duckdb_io_manager": duckdb_io_manager,
             "duckdb": duckdb_resource

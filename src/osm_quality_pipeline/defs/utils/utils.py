@@ -1,6 +1,5 @@
 import os
 
-import duckdb
 import geopandas as gpd
 import pandas as pd
 import dagster as dg

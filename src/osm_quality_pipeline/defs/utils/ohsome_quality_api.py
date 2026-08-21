@@ -1,3 +1,5 @@
+from os.path import exists
+
 import dagster as dg
 import pandas as pd
 
@@ -10,21 +12,28 @@ logger = dg.get_dagster_logger()
 def ohsome_quality_api_requests(duckdb, gdf, topic, partition_key, indicator, attribute=None):
     logger.info(f"start ohsome quality API queries for: {partition_key}, {topic}, {indicator}, {attribute}")
 
-    existing_df = duckdb.query_asset_results_df(partition_key, topic, indicator, attribute)
-    retry_ids, skip_ids = get_retry_rows_ids(existing_df)
+    table_name, table_exists = duckdb.check_if_table_exists(topic, indicator, attribute)
 
-    if len(existing_df) == 0:
+    if not table_exists:
         logger.info(f"No existing results, querying all {len(gdf)} rows")
         new_results = query_api_rows(gdf, topic, indicator, attribute)
         df = build_dataframe(gdf, indicator, new_results, topic)
-    elif len(existing_df) == len(gdf) and retry_ids.empty:
-        logger.info("All rows already successful, skipping API calls")
-        df = existing_df.copy()
     else:
-        logger.info(f"Rows to query: {len(retry_ids)}, rows skipping: {len(skip_ids)}")
-        retry_gdf = gdf[gdf["id"].isin(retry_ids["id"])]
-        new_results = query_api_rows(retry_gdf, topic, indicator, attribute)
-        df = merge_results(retry_gdf, existing_df, new_results, topic, indicator)
+        existing_df = duckdb.query_asset_results_df(partition_key, topic, indicator, attribute)
+        retry_ids, skip_ids = get_retry_rows_ids(existing_df)
+
+        if len(existing_df) == 0:
+            logger.info(f"No existing results, querying all {len(gdf)} rows")
+            new_results = query_api_rows(gdf, topic, indicator, attribute)
+            df = build_dataframe(gdf, indicator, new_results, topic)
+        elif len(existing_df) == len(gdf) and retry_ids.empty:
+            logger.info("All rows already successful, skipping API calls")
+            df = existing_df.copy()
+        else:
+            logger.info(f"Rows to query: {len(retry_ids)}, rows skipping: {len(skip_ids)}")
+            retry_gdf = gdf[gdf["id"].isin(retry_ids["id"])]
+            new_results = query_api_rows(retry_gdf, topic, indicator, attribute)
+            df = merge_results(retry_gdf, existing_df, new_results, topic, indicator)
 
     df, is_valid = validate_df(df)
     return df, is_valid
