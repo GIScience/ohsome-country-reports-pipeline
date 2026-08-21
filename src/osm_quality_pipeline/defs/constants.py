@@ -12,7 +12,7 @@ H3_ZOOM_LEVEL = None
 
 REQUIRED_TOPICS = [
     "roads-all-highways",
-    "building-count",
+    "buildings",
     "schools",
     "hospitals",
     "healthcare-primary",
@@ -69,20 +69,20 @@ OHSOME_QUALITY_API_URL = os.getenv("OHSOME_QUALITY_API_URL", "https://api.heigit
 OHSOME_API_KEY = os.getenv("OHSOME_API_KEY", "foo")
 
 TOPICS_BY_INDICATOR = {
-    "currentness": ["building-count", "roads", "land-cover", "schools", "hospitals"],
+    "currentness": ["buildings", "roads", "land-cover", "schools", "hospitals"],
     "mapping-saturation": [
-        "building-count",
+        "buildings",
         "roads",
         "land-cover",
         "schools",
         "hospitals",
     ],
-    "user-activity": ["building-count", "roads", "land-cover", "schools", "hospitals"],
-    "attribute-completeness": ["building-count", "roads", "schools", "hospitals"],
+    "user-activity": ["buildings", "roads", "land-cover", "schools", "hospitals"],
+    "attribute-completeness": ["buildings", "roads", "schools", "hospitals"],
 }
 
 TOPIC_ATTRIBUTES = {
-    "building-count": ["height", "building-material"],
+    "buildings": ["height", "building-material"],
     "roads": ["name", "maxspeed", "surface"],
     "schools": ["name", "phone-number", "website"],
     "hospitals": ["emergency", "name", "opening-hours", "speciality"],
@@ -98,7 +98,7 @@ ALL_TOPICS = sorted(
 )
 
 API_TOPIC_NAMES = {
-    "building-count": "Buildings (count)",
+    "buildings": "Buildings (count)",
     "hospitals": "Hospitals",
     "land-cover": "Land Use and Land Cover",
     "roads": "Roads (cars)",

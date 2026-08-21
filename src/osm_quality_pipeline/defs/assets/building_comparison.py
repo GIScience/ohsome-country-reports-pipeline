@@ -10,7 +10,7 @@ logger = dg.get_dagster_logger()
 
 @dg.asset(
     partitions_def=dynamic_country_layers_partition,
-    group_name="building_count",
+    group_name="buildings",
     deps=["country_layers"],
     metadata={
         "partition_expr": "partition_key"  # DuckDB maps partitions to the 'partition_key' column
@@ -22,7 +22,7 @@ def building_comparison(
         context: dg.AssetExecutionContext,
 ):
     INDICATOR = "building-comparison"
-    TOPIC = "building-area"
+    TOPIC = "buildings"
 
     country_layer = get_country_layer_from_partitionkey(context.partition_key)
     country = country_layer.country
@@ -36,7 +36,6 @@ def building_comparison(
         is_valid = True
     else:
         df, is_valid = oqapi_requests(gdf=gdf, topic=TOPIC, indicator=INDICATOR, partition_key=dynamic_country_layers_partition)
-        df["topic"] = "building-count" # give it the same topic name as others from the group to avoid confusion (should we do it like this???)
 
     # First, materialize dataframe into DuckDB
     yield dg.MaterializeResult(value=df)
