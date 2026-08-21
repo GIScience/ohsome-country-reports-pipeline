@@ -47,7 +47,7 @@ class BoundaryConfig(dg.Config):
     bkg_boundary_url: str = (
         f"https://storage.heigit.org/heigit-hdx-public/oqapi_hdx/boundaries"
     )
-    bkg_boundary_levels: [str] = ["vg2500_sta", "vg2500_lan", "vg25_gem"]
+    bkg_boundary_levels: [str] = ["vg2500_sta", "vg2500_lan", "vg1000_krs", "vg25_gem"]
     geoboundaries_levels: [str] = ["ADM0", "ADM1"]
 
 
