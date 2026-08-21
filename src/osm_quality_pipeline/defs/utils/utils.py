@@ -39,6 +39,7 @@ def empty_df(gdf, topic, indicator):
     df["description"] = "skipped: indicator not available for this country"
     df["quality_class"] = 0
     df["osm_timestamp"] = ""
+    df["figure"] = None
     return df
 
 
@@ -52,6 +53,7 @@ def handle_http_error(geom_id, indicator, resp, topic):
         resp.text,
         None,
         datetime.datetime.now(),
+        None
     ]
     return row_results
 
@@ -66,6 +68,7 @@ def handle_connection_error(geom_id, indicator, topic):
         "Network Failure",
         None,
         datetime.datetime.now(),
+        None
     ]
     return row_results
 
@@ -80,6 +83,7 @@ def handle_timeout_error(geom_id, indicator, topic):
         "Timeout Error",
         None,
         datetime.datetime.now(),
+        None
     ]
     return row_results
 
