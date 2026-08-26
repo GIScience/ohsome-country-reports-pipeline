@@ -65,8 +65,9 @@ CONFIG = Config()
 DATA_DIR = Path(os.getenv("DAGSTER_DATA_DIR"))
 
 
-OHSOME_QUALITY_API_URL = os.getenv("OHSOME_QUALITY_API_URL", "https://api.heigit.org/ohsome-quality-api-staging/v1")
+OHSOME_QUALITY_API_URL = os.getenv("OHSOME_QUALITY_API_URL", "https://api.heigit.org/ohsome-quality-api/v2")
 OHSOME_API_KEY = os.getenv("OHSOME_API_KEY", "foo")
+OHSOME_API_URL = os.getenv("OHSOME_API_URL", "https://api.heigit.org/ohsome-api/v2-rc")
 
 TOPICS_BY_INDICATOR = {
     "currentness": ["buildings", "roads", "land-cover", "schools", "hospitals"],

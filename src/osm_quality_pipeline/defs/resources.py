@@ -1,5 +1,7 @@
 import dagster as dg
 import requests as r
+import pandas as pd
+from io import StringIO
 
 from osm_quality_pipeline.defs.constants import DATA_DIR
 
@@ -9,7 +11,8 @@ from dagster_duckdb_pandas import DuckDBPandasIOManager
 
 
 from osm_quality_pipeline.defs.utils.utils import handle_http_error, handle_timeout_error, handle_connection_error, extract_values_from_oqapi_response
-from osm_quality_pipeline.defs.constants import CONFIG, OHSOME_QUALITY_API_URL, OHSOME_API_KEY
+from osm_quality_pipeline.defs.constants import CONFIG, OHSOME_QUALITY_API_URL, OHSOME_API_KEY, OHSOME_API_URL
+
 
 duckdb_io_manager = DuckDBPandasIOManager(
     database=f"{DATA_DIR}/asset_output.duckdb"
@@ -105,11 +108,51 @@ class OhsomeQualityApiResource(dg.ConfigurableResource):
 
 ohsome_quality_api = OhsomeQualityApiResource()
 
+
+class OhsomeApiResource(dg.ConfigurableResource):
+
+    @property
+    def base_url(self) -> str:
+        return OHSOME_API_URL
+
+    def stats_features(self, geojson_geometry, filter_expr, grouping_key, measure="count"):
+        url = f"{self.base_url}/stats/features/{measure}.csv"
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "Authorization": OHSOME_API_KEY
+        }
+
+        params = {
+            "aoi":  geojson_geometry,
+            "filter": filter_expr,
+            "time": "latest",
+            "groupBy": {"type": "byTag", "key": grouping_key}
+        }
+
+
+        try:
+            resp = r.post(url, json=params, headers=headers, timeout=180)
+            resp.raise_for_status()
+
+            df = pd.read_csv(
+                StringIO(resp.text),
+                delimiter=";",
+                header=3,  
+            )
+        except r.Timeout as e:
+            raise e
+
+        return df
+
+ohsome_api = OhsomeApiResource()
+
 @dg.definitions
 def resources() -> dg.Definitions:
     return dg.Definitions(
         resources={
             "ohsome_api": ohsome_quality_api,
+            "ohsome_api_v2": ohsome_api,
             "s3": s3_resource,
             "duckdb_io_manager": duckdb_io_manager,
             "duckdb": duckdb_resource
