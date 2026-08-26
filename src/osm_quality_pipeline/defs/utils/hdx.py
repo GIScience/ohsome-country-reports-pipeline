@@ -18,7 +18,7 @@ def get_s3_links(config, country, s3):
     links_list = [
         (f"https://{config.host}/{config.bucket}/{obj['Key']}", obj["Key"].split("/")[-1],)
         for obj in response.get("Contents", [])
-        if obj["Key"].lower().endswith(".zip")  # later change this to get gpkgs and csvs
+        if obj["Key"].lower().endswith((".gpkg", ".csv"))
     ]
     logger.info(links_list)
     return links_list
