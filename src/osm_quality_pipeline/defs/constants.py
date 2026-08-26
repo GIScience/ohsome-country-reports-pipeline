@@ -79,6 +79,7 @@ TOPICS_BY_INDICATOR = {
     ],
     "user-activity": ["buildings", "roads", "land-cover", "schools", "hospitals"],
     "attribute-completeness": ["buildings", "roads", "schools", "hospitals"],
+    "tag-distribution": ["buildings", "roads", "schools", "hospitals", "land-cover"],
 }
 
 TOPIC_ATTRIBUTES = {
