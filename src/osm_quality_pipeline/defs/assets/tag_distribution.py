@@ -7,7 +7,7 @@ from osm_quality_pipeline.defs.partitions import (
     get_country_layer_from_partitionkey,
 )
 from osm_quality_pipeline.defs.resources import OhsomeApiResource
-from osm_quality_pipeline.defs.utils.ohsome import request_loop
+from osm_quality_pipeline.defs.utils.ohsome import request_loop, extract_yaml_info
 from osm_quality_pipeline.defs.utils.utils import load_layer_as_gdf
 
 logger = dg.get_dagster_logger()
@@ -38,11 +38,10 @@ def make_tag_distribution_asset(topic: str):
 
         gdf = load_layer_as_gdf(context, country, layer)
 
-        filter_expr = "geometry:polygon and building=*"
-        grouping_keys = ["building", "levels"]
+        measure, filter_expr, grouping_keys = extract_yaml_info(topic)
         all_results = []
         for key in grouping_keys:
-            test = request_loop(gdf, ohsome_api_v2, filter_expr, key)
+            test = request_loop(gdf, ohsome_api_v2, filter_expr, key, measure)
             all_results.append(test)
 
         df_merged = pd.concat(all_results)

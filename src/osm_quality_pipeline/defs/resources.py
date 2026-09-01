@@ -115,7 +115,7 @@ class OhsomeApiResource(dg.ConfigurableResource):
     def base_url(self) -> str:
         return OHSOME_API_URL
 
-    def stats_features(self, geojson_geometry, filter_expr, grouping_key, measure="count"):
+    def stats_features(self, geojson_geometry, filter_expr, grouping_key, measure):
         url = f"{self.base_url}/stats/features/{measure}.csv"
         headers = {
             "Accept": "application/json",

@@ -1,0 +1,21 @@
+topics:
+  buildings:
+    measure: "count"
+    filter_expr: "building=* and building!=no and geometry:polygon"
+    grouping_keys: ["building"]
+  roads:
+    measure: "count"
+    filter_expr: "highway=* and geometry:line"
+    grouping_keys: ["highway"]
+  schools:
+    measure: "count"
+    filter_expr: "amenity=school and (geometry:polygon or geometry:point)"
+    grouping_keys: ["operator:type", "isced:level"]
+  hospitals:
+    measure: "count"
+    filter_expr: "(amenity=hospital or healthcare=hospital) and (geometry:polygon or geometry:point)"
+    grouping_keys: ["operator:type", "healthcare:speciality"]
+  land-cover:
+    measure: "count"
+    filter_expr: "((landuse=* and landuse!=no) or natural in (wood,  grassland, scrub, heath, fell, beach, sand, scree,  shingle, bare_rock, glacier, mud, rock, cliff, fill, wetland, water, pond) or leisure in (marina, park,  garden, pitch, golf_course, playground, stadium,  recreation_ground, common, dog_park)) and geometry:polygon"
+    grouping_keys: ["landuse"]
