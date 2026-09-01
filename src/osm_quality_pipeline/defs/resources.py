@@ -11,7 +11,7 @@ from dagster_duckdb_pandas import DuckDBPandasIOManager
 
 
 from osm_quality_pipeline.defs.utils.utils import handle_http_error, handle_timeout_error, handle_connection_error, extract_values_from_oqapi_response
-from osm_quality_pipeline.defs.constants import CONFIG, OHSOME_QUALITY_API_URL, OHSOME_API_KEY, OHSOME_API_URL
+from osm_quality_pipeline.defs.constants import CONFIG, OHSOME_QUALITY_API_URL, HEIGIT_API_KEY, OHSOME_API_URL
 
 
 duckdb_io_manager = DuckDBPandasIOManager(
@@ -82,7 +82,7 @@ class OhsomeQualityApiResource(dg.ConfigurableResource):
         headers = {
             "Accept": "application/json",
             "Content-Type": "application/json",
-            "Authorization": OHSOME_API_KEY
+            "Authorization": HEIGIT_API_KEY
         }
 
         params = {
@@ -120,7 +120,7 @@ class OhsomeApiResource(dg.ConfigurableResource):
         headers = {
             "Accept": "application/json",
             "Content-Type": "application/json",
-            "Authorization": OHSOME_API_KEY
+            "Authorization": HEIGIT_API_KEY
         }
 
         params = {
