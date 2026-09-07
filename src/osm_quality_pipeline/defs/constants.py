@@ -63,6 +63,7 @@ class Config(BaseSettings):
 CONFIG = Config()
 
 DATA_DIR = Path(os.getenv("DAGSTER_DATA_DIR"))
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
 OHSOME_QUALITY_API_URL = os.getenv("OHSOME_QUALITY_API_URL", "https://api.heigit.org/ohsome-quality-api/v2")
