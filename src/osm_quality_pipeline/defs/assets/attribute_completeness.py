@@ -49,7 +49,8 @@ def make_attribute_completeness_asset(topic: str):
                 gdf=gdf,
                 topic=topic,
                 indicator=INDICATOR,
-                partition_key=context.partition_key
+                partition_key=context.partition_key,
+                attribute=attribute
             )
             df["attribute"] = attribute
             df_list.append(df)
