@@ -3,15 +3,41 @@ import requests as r
 import pandas as pd
 from io import StringIO
 
-from osm_quality_pipeline.defs.constants import DATA_DIR
-
 from dagster_aws.s3 import S3Resource
 from dagster_duckdb import DuckDBResource
 from dagster_duckdb_pandas import DuckDBPandasIOManager
 
 
 from osm_quality_pipeline.defs.utils.utils import handle_http_error, handle_timeout_error, handle_connection_error, extract_values_from_oqapi_response
-from osm_quality_pipeline.defs.constants import CONFIG, OHSOME_QUALITY_API_URL, HEIGIT_API_KEY, OHSOME_API_URL
+from osm_quality_pipeline.defs.utils.rate_limiter import ApiRateLimiter
+from osm_quality_pipeline.defs.constants import (
+    CONFIG,
+    DATA_DIR,
+    OHSOME_QUALITY_API_URL,
+    HEIGIT_API_KEY,
+    OHSOME_API_URL,
+    OHSOME_QUALITY_API_MAX_PER_HOUR,
+    OHSOME_QUALITY_API_MAX_PER_DAY,
+    OHSOME_API_MAX_PER_HOUR,
+    OHSOME_API_MAX_PER_DAY,
+)
+
+
+RATE_LIMITER_DB_PATH = f"{DATA_DIR}/rate_limits.sqlite"
+
+oqapi_rate_limiter = ApiRateLimiter(
+    db_path=RATE_LIMITER_DB_PATH,
+    api_name="ohsome_quality_api",
+    max_per_hour=OHSOME_QUALITY_API_MAX_PER_HOUR,
+    max_per_day=OHSOME_QUALITY_API_MAX_PER_DAY,
+)
+
+ohsome_api_rate_limiter = ApiRateLimiter(
+    db_path=RATE_LIMITER_DB_PATH,
+    api_name="ohsome_api",
+    max_per_hour=OHSOME_API_MAX_PER_HOUR,
+    max_per_day=OHSOME_API_MAX_PER_DAY,
+)
 
 
 duckdb_io_manager = DuckDBPandasIOManager(
@@ -93,6 +119,8 @@ class OhsomeQualityApiResource(dg.ConfigurableResource):
         if indicator == "attribute-completeness":
             params["attributes"] = [attribute]
 
+        oqapi_rate_limiter.acquire()
+
         try:
             resp = r.post(url, json=params, headers=headers, timeout=120)
             resp.raise_for_status()
@@ -130,6 +158,7 @@ class OhsomeApiResource(dg.ConfigurableResource):
             "groupBy": {"type": "byTag", "key": grouping_key}
         }
 
+        ohsome_api_rate_limiter.acquire()
 
         try:
             resp = r.post(url, json=params, headers=headers, timeout=180)
