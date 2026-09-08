@@ -17,6 +17,7 @@ dependencies = [
     "dagster-duckdb-pandas>=0.28.4",
     "pydantic-settings>=2.14.2",
     "hdx-python-api>=6.6.8",
+    "pyarrow>=18.0.0",
 ]
 
 [project.optional-dependencies]

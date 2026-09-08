@@ -34,6 +34,12 @@ class ApiQuotaTracker:
                 "CREATE TABLE IF NOT EXISTS requests "
                 "(api_name TEXT NOT NULL, ts REAL NOT NULL, remaining INTEGER, quota_limit INTEGER)"
             )
+            # migrate tables created by the older ApiRateLimiter, which only had (api_name, ts)
+            existing_columns = {row[1] for row in conn.execute("PRAGMA table_info(requests)").fetchall()}
+            if "remaining" not in existing_columns:
+                conn.execute("ALTER TABLE requests ADD COLUMN remaining INTEGER")
+            if "quota_limit" not in existing_columns:
+                conn.execute("ALTER TABLE requests ADD COLUMN quota_limit INTEGER")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_requests_api_ts ON requests(api_name, ts)")
         finally:
             conn.close()
