@@ -24,6 +24,7 @@ def load_layer_as_gdf(context, country, layer):
 
     gdf.drop(columns, axis=1, inplace=True)
 
+    gdf["id"] = gdf["id"].astype(str)
     gdf["partition_key"] = context.partition_key
     return gdf
 
