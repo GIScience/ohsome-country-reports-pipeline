@@ -33,42 +33,32 @@ s3_resource = S3Resource(
 )
 
 
-def build_table_name(topic, indicator, attribute):
+def build_table_name(topic, indicator):
 
     topic_name = topic.replace('-', '_')
     indicator_name = indicator.replace('-', '_')
-    if attribute:
-        attribute_name = attribute.replace('-', '_')
-        table_name = f"{topic_name}_{indicator_name}_{attribute_name}"
-    else:
-        table_name = f"{topic_name}_{indicator_name}"
-
-    return table_name
+    return f"{topic_name}_{indicator_name}"
 
 
 class CustomDuckDBResource(DuckDBResource):
 
     def query_asset_results_df(self, partition_key, topic, indicator, attribute):
-        table_name = build_table_name(topic, indicator, attribute)
+        table_name = build_table_name(topic, indicator)
+        query = f"SELECT * FROM public.{table_name} WHERE partition_key = '{partition_key}'"
+        if attribute:
+            query += f" AND attribute = '{attribute}'"
         with self.get_connection() as conn:
-            df = conn.execute(
-                f"SELECT * FROM public.{table_name} WHERE partition_key = '{partition_key}'"
-            ).fetchdf()
+            df = conn.execute(query).fetchdf()
             return df
 
     def check_if_table_exists(self, topic, indicator, attribute):
-        table_name = build_table_name(topic, indicator, attribute)
+        table_name = build_table_name(topic, indicator)
         with self.get_connection() as conn:
             count = conn.execute(
                 f"SELECT COUNT(*) FROM information_schema.tables WHERE table_name = '{table_name}'"
-            ).fetchone()
+            ).fetchone()[0]
 
-            print(count)
-
-            if count == 1:
-                table_exists = True
-            else:
-                table_exists = False
+            table_exists = count == 1
 
             return table_name, table_exists
 
