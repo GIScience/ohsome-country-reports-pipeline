@@ -3,7 +3,7 @@ from os.path import exists
 import dagster as dg
 import pandas as pd
 
-from osm_quality_pipeline.defs.resources import OhsomeQualityApiResource, oqapi_rate_limiter
+from osm_quality_pipeline.defs.resources import OhsomeQualityApiResource
 
 
 logger = dg.get_dagster_logger()
@@ -51,7 +51,6 @@ def get_retry_rows_ids(existing_df):
 
 
 def query_api_rows(gdf, topic, indicator, attribute):
-    oqapi_rate_limiter.log_remaining(len(gdf))
     new_columns = []
     for i, (_, row) in enumerate(gdf.iterrows()):
         geojson_geometry = get_geojson_geometry(row)

@@ -113,6 +113,36 @@ def indicator_results_gpkg_s3(context: dg.AssetExecutionContext, s3: S3Resource,
     upload_file_to_s3(gpkg_path, country_code, s3)
 
 
+@dg.asset(
+    partitions_def=dynamic_country_layers_partition,
+    group_name="outputs",
+    ins=ins
+)
+def indicator_results_parquet_s3(context: dg.AssetExecutionContext, s3: S3Resource, **kwargs) -> None:
+    dfs = [df for df in kwargs.values() if df is not None]
+    if not dfs:
+        return None
+
+    combined = pd.concat(dfs)
+    combined["indicator"] = combined.apply(
+        lambda r: f"{r['indicator']}_{r['attribute']}"
+        if pd.notna(r.get("attribute"))
+        else r["indicator"],
+        axis=1,
+    )
+    long_df = combined.rename(columns={"id": "geomID"})[
+        ["geomID", "topic", "indicator", "value", "description", "quality_class"]
+    ]
+
+    country_layer = get_country_layer_from_partitionkey(context.partition_key)
+    country_code = country_layer.country
+    layer = country_layer.layer
+
+    parquet_path = f"{DATA_DIR}/{country_code}/{country_code}_{layer}_long.parquet"
+
+    long_df.to_parquet(parquet_path, index=False)
+
+    upload_file_to_s3(parquet_path, country_code, s3)
 
 
 def upload_file_to_s3(file_path: str, country_code:str, s3: S3Resource) -> None:

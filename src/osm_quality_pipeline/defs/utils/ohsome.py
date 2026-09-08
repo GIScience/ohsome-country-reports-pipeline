@@ -4,13 +4,10 @@ import dagster as dg
 import pandas as pd
 import yaml
 
-from osm_quality_pipeline.defs.resources import ohsome_api_rate_limiter
-
 logger = dg.get_dagster_logger()
 
 
 def request_loop(gdf, ohsome_api_v2, filter_expr, grouping_key, measure):
-    ohsome_api_rate_limiter.log_remaining(len(gdf))
     new_columns = []
     #concurrency??
     for i, (_, row) in enumerate(gdf.iterrows()):

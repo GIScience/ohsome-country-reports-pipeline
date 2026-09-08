@@ -1,3 +1,4 @@
+import datetime
 import sqlite3
 import time
 
@@ -5,131 +6,100 @@ import dagster as dg
 
 logger = dg.get_dagster_logger()
 
-HOUR = 3600
-DAY = 86400
 
+class ApiQuotaTracker:
+    """Tracks HeiGIT's own per-key quota, reported via `x-ratelimit-*` response
+    headers on every request. That quota is shared across all APIs behind the
+    same gateway key (ohsome-quality-api and ohsome-api both draw from the same
+    pool), so this is one tracker for both, not one per API.
 
-class ApiRateLimiter:
-    """Caps requests to an external API to N per hour / N per day.
-
-    State is persisted in SQLite (not memory) because asset steps run as
-    separate processes under the multiprocess executor, and nothing at the
-    Dagster level currently serializes concurrent runs. acquire() therefore
-    does its check-then-reserve inside a BEGIN IMMEDIATE transaction, which
-    takes SQLite's write lock up front so two processes racing to acquire at
-    the same instant can't both pass the check before either one records its
-    request.
+    Unlike a locally-guessed cap, this reacts to the server's own authoritative
+    numbers: it warns once quota gets low, and pauses (sleeping until the
+    server-reported reset time) once it's actually exhausted, instead of
+    hammering the API into repeated 403s. It also keeps a history log of every
+    request (timestamp + api_name) for later "how many requests per hour" style
+    reporting - something the live headers alone can't answer, since they only
+    ever describe the current moment.
     """
 
-    def __init__(self, db_path, api_name, max_per_hour=None, max_per_day=None):
+    def __init__(self, db_path, warn_threshold_ratio=0.05):
         self.db_path = db_path
-        self.api_name = api_name
-        self.max_per_hour = max_per_hour
-        self.max_per_day = max_per_day
+        self.warn_threshold_ratio = warn_threshold_ratio
+        self._warned_low = False
+        self._last_reset = None
+
         conn = self._connect()
         try:
             conn.execute(
-                "CREATE TABLE IF NOT EXISTS requests (api_name TEXT NOT NULL, ts REAL NOT NULL)"
+                "CREATE TABLE IF NOT EXISTS requests "
+                "(api_name TEXT NOT NULL, ts REAL NOT NULL, remaining INTEGER, quota_limit INTEGER)"
             )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_requests_api_ts ON requests(api_name, ts)"
-            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_requests_api_ts ON requests(api_name, ts)")
         finally:
             conn.close()
 
     def _connect(self):
-        # isolation_level=None -> autocommit mode, so we control transactions
-        # explicitly (needed for BEGIN IMMEDIATE in acquire()).
         conn = sqlite3.connect(self.db_path, timeout=30, isolation_level=None)
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA busy_timeout=30000")
         return conn
 
-    def _count_since(self, conn, since):
-        return conn.execute(
-            "SELECT COUNT(*) FROM requests WHERE api_name = ? AND ts > ?",
-            (self.api_name, since),
-        ).fetchone()[0]
-
-    def _oldest_since(self, conn, since):
-        return conn.execute(
-            "SELECT MIN(ts) FROM requests WHERE api_name = ? AND ts > ?",
-            (self.api_name, since),
-        ).fetchone()[0]
-
-    def remaining(self):
-        """(remaining_this_hour, remaining_this_day); None means no limit configured.
-
-        A plain (non-locking) read: a momentary race with a concurrent
-        acquire() only affects this informational snapshot, never the count
-        actually enforced.
+    def observe(self, api_name, headers):
+        """Call once right after receiving a response (success or error - the
+        gateway sets these headers either way). Records the request, warns on
+        low quota, and blocks until reset if the server reports it's exhausted.
         """
-        now = time.time()
+        remaining = headers.get("x-ratelimit-remaining")
+        limit = headers.get("x-ratelimit-limit")
+        reset = headers.get("x-ratelimit-reset")
+
+        remaining = int(remaining) if remaining is not None else None
+        limit = int(limit) if limit is not None else None
+        reset = int(reset) if reset is not None else None
+
         conn = self._connect()
         try:
-            hour_left = (
-                max(self.max_per_hour - self._count_since(conn, now - HOUR), 0)
-                if self.max_per_hour is not None
-                else None
-            )
-            day_left = (
-                max(self.max_per_day - self._count_since(conn, now - DAY), 0)
-                if self.max_per_day is not None
-                else None
+            conn.execute(
+                "INSERT INTO requests (api_name, ts, remaining, quota_limit) VALUES (?, ?, ?, ?)",
+                (api_name, time.time(), remaining, limit),
             )
         finally:
             conn.close()
-        return hour_left, day_left
 
-    def log_remaining(self, n_upcoming_requests):
-        hour_left, day_left = self.remaining()
-        if hour_left is None and day_left is None:
-            logger.info(f"[{self.api_name}] no rate limit configured, processing all {n_upcoming_requests} rows")
+        if remaining is None or limit is None:
             return
 
-        limits = [x for x in (hour_left, day_left) if x is not None]
-        free_now = min(limits)
-        parts = []
-        if hour_left is not None:
-            parts.append(f"{hour_left}/hour")
-        if day_left is not None:
-            parts.append(f"{day_left}/day")
+        if reset != self._last_reset:
+            self._last_reset = reset
+            self._warned_low = False
 
-        if free_now >= n_upcoming_requests:
-            logger.info(f"[{self.api_name}] {', '.join(parts)} remaining, enough to process all {n_upcoming_requests} rows")
-        else:
-            logger.info(
-                f"[{self.api_name}] {', '.join(parts)} remaining; will process {free_now} of "
-                f"{n_upcoming_requests} rows now, then pause and resume automatically once the limit frees up"
+        if remaining <= 0:
+            if reset is not None:
+                wait_for = max(reset - time.time(), 0) + 1
+                logger.warning(f"[{api_name}] API quota exhausted (0/{limit}); sleeping {wait_for:.0f}s until reset")
+                time.sleep(wait_for)
+            return
+
+        if not self._warned_low and remaining <= limit * self.warn_threshold_ratio:
+            reset_str = (
+                datetime.datetime.fromtimestamp(reset, tz=datetime.timezone.utc).isoformat()
+                if reset is not None
+                else "unknown"
             )
+            logger.warning(f"[{api_name}] API quota low: {remaining}/{limit} remaining, resets at {reset_str}")
+            self._warned_low = True
 
-    def acquire(self):
-        """Blocks until a request slot is free, then reserves it.
+    def hourly_counts(self, since_hours=48, api_name=None):
+        since = time.time() - since_hours * 3600
+        query = "SELECT strftime('%Y-%m-%d %H:00', ts, 'unixepoch', 'localtime') AS hour, COUNT(*) FROM requests WHERE ts > ?"
+        params = [since]
+        if api_name is not None:
+            query += " AND api_name = ?"
+            params.append(api_name)
+        query += " GROUP BY hour ORDER BY hour"
 
-        Safe under concurrent processes: the check and the reservation happen
-        inside one BEGIN IMMEDIATE transaction, so only one caller at a time
-        (across all processes) can be evaluating "is there room" at once.
-        """
-        while True:
-            now = time.time()
-            conn = self._connect()
-            try:
-                conn.execute("BEGIN IMMEDIATE")
-                wait_for = 0.0
-                if self.max_per_hour is not None and self._count_since(conn, now - HOUR) >= self.max_per_hour:
-                    wait_for = max(wait_for, self._oldest_since(conn, now - HOUR) + HOUR - now)
-                if self.max_per_day is not None and self._count_since(conn, now - DAY) >= self.max_per_day:
-                    wait_for = max(wait_for, self._oldest_since(conn, now - DAY) + DAY - now)
-
-                if wait_for <= 0:
-                    conn.execute("INSERT INTO requests (api_name, ts) VALUES (?, ?)", (self.api_name, now))
-                    conn.execute("COMMIT")
-                    return
-
-                conn.execute("COMMIT")  # release the write lock before sleeping
-            finally:
-                conn.close()
-
-            sleep_for = min(wait_for, 60) + 0.1
-            logger.info(f"[{self.api_name}] rate limit reached, sleeping {sleep_for:.0f}s until a slot frees up")
-            time.sleep(sleep_for)
+        conn = self._connect()
+        try:
+            return conn.execute(query, params).fetchall()
+        finally:
+            conn.close()

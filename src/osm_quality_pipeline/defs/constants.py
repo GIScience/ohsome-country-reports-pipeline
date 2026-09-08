@@ -70,16 +70,6 @@ OHSOME_QUALITY_API_URL = os.getenv("OHSOME_QUALITY_API_URL", "https://api.heigit
 HEIGIT_API_KEY = os.getenv("HEIGIT_API_KEY", "foo")
 OHSOME_API_URL = os.getenv("OHSOME_API_URL", "https://api.heigit.org/ohsome-api/v2-rc")
 
-
-def _int_or_none(value):
-    return int(value) if value else None
-
-
-OHSOME_QUALITY_API_MAX_PER_HOUR = _int_or_none(os.getenv("OHSOME_QUALITY_API_MAX_PER_HOUR"))
-OHSOME_QUALITY_API_MAX_PER_DAY = _int_or_none(os.getenv("OHSOME_QUALITY_API_MAX_PER_DAY"))
-OHSOME_API_MAX_PER_HOUR = _int_or_none(os.getenv("OHSOME_API_MAX_PER_HOUR"))
-OHSOME_API_MAX_PER_DAY = _int_or_none(os.getenv("OHSOME_API_MAX_PER_DAY"))
-
 TOPICS_BY_INDICATOR = {
     "currentness": ["buildings", "roads", "land-cover", "schools", "hospitals"],
     "mapping-saturation": [
