@@ -41,7 +41,8 @@ def building_comparison(
             gdf=gdf,
             topic=TOPIC,
             indicator=INDICATOR,
-            partition_key=context.partition_key
+            partition_key=context.partition_key,
+            table_name=context.asset_key.path[-1]
         )
 
     # First, materialize dataframe into DuckDB

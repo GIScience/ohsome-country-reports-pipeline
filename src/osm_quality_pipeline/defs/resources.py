@@ -8,7 +8,15 @@ from dagster_duckdb import DuckDBResource
 from dagster_duckdb_pandas import DuckDBPandasIOManager
 
 
-from osm_quality_pipeline.defs.utils.utils import handle_http_error, handle_timeout_error, handle_connection_error, extract_values_from_oqapi_response
+from osm_quality_pipeline.defs.utils.utils import (
+    handle_http_error,
+    handle_timeout_error,
+    handle_connection_error,
+    handle_stats_http_error,
+    handle_stats_timeout_error,
+    handle_stats_connection_error,
+    extract_values_from_oqapi_response,
+)
 from osm_quality_pipeline.defs.utils.rate_limiter import ApiQuotaTracker
 from osm_quality_pipeline.defs.constants import (
     CONFIG,
@@ -42,17 +50,17 @@ def build_table_name(topic, indicator):
 
 class CustomDuckDBResource(DuckDBResource):
 
-    def query_asset_results_df(self, partition_key, topic, indicator, attribute):
-        table_name = build_table_name(topic, indicator)
+    def query_asset_results_df(self, partition_key, topic, indicator, attribute, attribute_column="attribute", table_name=None):
+        table_name = table_name or build_table_name(topic, indicator)
         query = f"SELECT * FROM public.{table_name} WHERE partition_key = '{partition_key}'"
         if attribute:
-            query += f" AND attribute = '{attribute}'"
+            query += f" AND {attribute_column} = '{attribute}'"
         with self.get_connection() as conn:
             df = conn.execute(query).fetchdf()
             return df
 
-    def check_if_table_exists(self, topic, indicator, attribute):
-        table_name = build_table_name(topic, indicator)
+    def check_if_table_exists(self, topic, indicator, attribute, table_name=None):
+        table_name = table_name or build_table_name(topic, indicator)
         with self.get_connection() as conn:
             count = conn.execute(
                 f"SELECT COUNT(*) FROM information_schema.tables WHERE table_name = '{table_name}'"
@@ -137,10 +145,16 @@ class OhsomeApiResource(dg.ConfigurableResource):
             df = pd.read_csv(
                 StringIO(resp.text),
                 delimiter=";",
-                header=3,  
+                header=3,
             )
-        except r.Timeout as e:
-            raise e
+            df["status_code"] = 200
+            df["description"] = None
+        except r.Timeout:
+            df = handle_stats_timeout_error()
+        except r.ConnectionError:
+            df = handle_stats_connection_error()
+        except r.HTTPError:
+            df = handle_stats_http_error(resp)
 
         return df
 

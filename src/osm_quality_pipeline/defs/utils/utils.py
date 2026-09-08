@@ -88,6 +88,31 @@ def handle_timeout_error(geom_id, indicator, topic):
     return row_results
 
 
+def empty_stats_df(status_code, description):
+    return pd.DataFrame([{
+        "timestamp": datetime.datetime.now().isoformat(),
+        "value": None,
+        "tagvalue": None,
+        "status_code": status_code,
+        "description": description,
+    }])
+
+
+def handle_stats_http_error(resp):
+    logger.warning(f"API error {resp.status_code} for tag distribution request")
+    return empty_stats_df(resp.status_code, resp.text)
+
+
+def handle_stats_timeout_error():
+    logger.warning("Timeout for tag distribution request")
+    return empty_stats_df(999, "Timeout Error")
+
+
+def handle_stats_connection_error():
+    logger.warning("Network failure for tag distribution request")
+    return empty_stats_df(998, "Network Failure")
+
+
 def extract_values_from_oqapi_response(response):
     data = response.json()
     result = data["result"][0]

@@ -9,17 +9,17 @@ from osm_quality_pipeline.defs.resources import OhsomeQualityApiResource
 logger = dg.get_dagster_logger()
 
 
-def ohsome_quality_api_requests(duckdb, gdf, topic, partition_key, indicator, attribute=None):
+def ohsome_quality_api_requests(duckdb, gdf, topic, partition_key, indicator, attribute=None, table_name=None):
     logger.info(f"start ohsome quality API queries for: {partition_key}, {topic}, {indicator}, {attribute}")
 
-    table_name, table_exists = duckdb.check_if_table_exists(topic, indicator, attribute)
+    table_name, table_exists = duckdb.check_if_table_exists(topic, indicator, attribute, table_name=table_name)
 
     if not table_exists:
         logger.info(f"No existing results, querying all {len(gdf)} rows")
         new_results = query_api_rows(gdf, topic, indicator, attribute)
         df = build_dataframe(gdf, indicator, new_results, topic)
     else:
-        existing_df = duckdb.query_asset_results_df(partition_key, topic, indicator, attribute)
+        existing_df = duckdb.query_asset_results_df(partition_key, topic, indicator, attribute, table_name=table_name)
         retry_ids, skip_ids = get_retry_rows_ids(existing_df)
 
         if len(existing_df) == 0:

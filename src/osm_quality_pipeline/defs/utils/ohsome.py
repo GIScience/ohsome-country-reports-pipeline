@@ -8,21 +8,68 @@ logger = dg.get_dagster_logger()
 
 
 def request_loop(gdf, ohsome_api_v2, filter_expr, grouping_key, measure):
-    new_columns = []
-    #concurrency??
+    new_rows = []
     for i, (_, row) in enumerate(gdf.iterrows()):
         geometry = row.geometry.__geo_interface__
-        row_results = ohsome_api_v2.stats_features(
+        row_df = ohsome_api_v2.stats_features(
             geojson_geometry=geometry,
             filter_expr=filter_expr,
             grouping_key=grouping_key,
             measure=measure
         )
+        row_df = row_df.copy()
+        row_df["id"] = row["id"]
 
-        new_columns.append(row_results)
+        new_rows.append(row_df)
         logger.info(f"finished: {i + 1}/{len(gdf)}")
-        # new function call here that makes the plot and saves it as json in a pd df
-    return pd.concat(new_columns)
+    return pd.concat(new_rows, ignore_index=True)
+
+
+def get_stats_retry_ids(existing_df):
+    existing_df = existing_df.copy()
+    existing_df["id"] = existing_df["id"].astype(str)
+    # one row per id: every row for the same id shares the same status_code
+    per_id = existing_df[["id", "status_code"]].drop_duplicates(subset="id")
+    needs_retry = per_id["status_code"].isna() | (per_id["status_code"] != 200)
+    retry_ids = per_id[needs_retry][["id"]]
+    skip_ids = per_id[~needs_retry][["id"]]
+    return retry_ids, skip_ids
+
+
+def tag_distribution_requests(duckdb, gdf, ohsome_api_v2, topic, partition_key, filter_expr, grouping_key, measure):
+    logger.info(f"start ohsome API tag distribution queries for: {partition_key}, {topic}, {grouping_key}")
+
+    indicator = "tag-distribution"
+    table_name, table_exists = duckdb.check_if_table_exists(topic, indicator, grouping_key)
+
+    if not table_exists:
+        logger.info(f"No existing results, querying all {len(gdf)} rows")
+        df = request_loop(gdf, ohsome_api_v2, filter_expr, grouping_key, measure)
+    else:
+        existing_df = duckdb.query_asset_results_df(
+            partition_key, topic, indicator, grouping_key, attribute_column="grouping_key"
+        )
+        retry_ids, skip_ids = get_stats_retry_ids(existing_df)
+        n_existing_ids = existing_df["id"].astype(str).nunique()
+
+        if len(existing_df) == 0:
+            logger.info(f"No existing results, querying all {len(gdf)} rows")
+            df = request_loop(gdf, ohsome_api_v2, filter_expr, grouping_key, measure)
+        elif n_existing_ids == len(gdf) and retry_ids.empty:
+            logger.info("All rows already successful, skipping API calls")
+            df = existing_df.copy()
+        else:
+            logger.info(f"Rows to query: {len(retry_ids)}, rows skipping: {len(skip_ids)}")
+            existing_df = existing_df.copy()
+            existing_df["id"] = existing_df["id"].astype(str)
+            retry_gdf = gdf[gdf["id"].isin(retry_ids["id"])]
+            new_df = request_loop(retry_gdf, ohsome_api_v2, filter_expr, grouping_key, measure)
+            kept = existing_df[~existing_df["id"].isin(retry_ids["id"])]
+            df = pd.concat([kept, new_df], ignore_index=True)
+
+    df["partition_key"] = partition_key
+    is_valid = ~(df.drop_duplicates("id")["status_code"] != 200).any()
+    return df, is_valid
 
 
 def extract_yaml_info(topic):
