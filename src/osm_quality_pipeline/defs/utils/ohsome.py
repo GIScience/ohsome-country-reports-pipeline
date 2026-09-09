@@ -3,6 +3,7 @@ import requests
 import dagster as dg
 import pandas as pd
 import yaml
+import plotly.express as px
 
 logger = dg.get_dagster_logger()
 
@@ -19,10 +20,43 @@ def request_loop(gdf, ohsome_api_v2, filter_expr, grouping_key, measure):
         )
         row_df = row_df.copy()
         row_df["id"] = row["id"]
-
-        new_rows.append(row_df)
+        plot_df = create_treemap(row_df)
+        new_rows.append(plot_df)
         logger.info(f"finished: {i + 1}/{len(gdf)}")
+
     return pd.concat(new_rows, ignore_index=True)
+
+
+def create_treemap(row_df):
+    df = row_df.copy()
+    top = df.dropna(subset=["tagvalue"]).sort_values("value", ascending=False).head(6)
+    remainder = df.dropna(subset=["tagvalue"])["value"].sum() - top["value"].sum()
+
+    plot_df = top[["tagvalue", "value"]].copy()
+
+    if remainder > 0:
+        plot_df.loc[len(plot_df)] = ["remainder", remainder]
+
+    fig = px.treemap(
+        plot_df,
+        path=["tagvalue"],
+        values="value",
+        color="tagvalue",
+        color_discrete_map={"remainder": "#929292"}
+    )
+
+    fig.update_traces(
+        texttemplate="<b>%{label}</b><br>%{value:,.0f} km<br>(%{percentRoot:.1%})",
+        marker_line=dict(color="white", width=2)
+    )
+    fig.update_layout(autosize=True, margin=dict(t=5, l=5, r=5, b=5))
+    result = df.iloc[[0]].drop(columns="tagvalue")
+    result = result.drop(columns="value")
+    result["treemap"] = fig.to_json()
+
+    return result
+
+
 
 
 def get_stats_retry_ids(existing_df):
