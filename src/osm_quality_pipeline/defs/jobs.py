@@ -1,6 +1,14 @@
 import dagster as dg
 
-from osm_quality_pipeline.defs.partitions import dynamic_country_layers_partition
+from osm_quality_pipeline.defs.partitions import country_partitions, dynamic_country_layers_partition
+
+
+country_preparation = dg.define_asset_job(
+    name="country_preparation_job",
+    description="Downloads country boundaries and builds the boundaries pmtiles.",
+    selection='key:"country_layers" or key:"country_boundaries_pmtiles"',
+    partitions_def=country_partitions
+)
 
 
 ohsome_quality_api_requests = dg.define_asset_job(
