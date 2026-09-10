@@ -39,7 +39,7 @@ def make_tag_distribution_asset(topic: str):
 
         gdf = load_layer_as_gdf(context, country, layer)
 
-        measure, filter_expr, grouping_keys = extract_yaml_info(topic)
+        measures, filter_expr, grouping_keys = extract_yaml_info(topic)
         all_results = []
         is_valid_list = []
         for key in grouping_keys:
@@ -51,7 +51,7 @@ def make_tag_distribution_asset(topic: str):
                 partition_key=context.partition_key,
                 filter_expr=filter_expr,
                 grouping_key=key,
-                measure=measure
+                measures=measures
             )
             df["grouping_key"] = key
             all_results.append(df)

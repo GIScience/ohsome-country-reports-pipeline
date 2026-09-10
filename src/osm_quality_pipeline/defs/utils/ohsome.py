@@ -8,26 +8,40 @@ import plotly.express as px
 logger = dg.get_dagster_logger()
 
 
-def request_loop(gdf, ohsome_api_v2, filter_expr, grouping_key, measure):
+def request_loop(gdf, ohsome_api_v2, filter_expr, grouping_key, measures):
     new_rows = []
     for i, (_, row) in enumerate(gdf.iterrows()):
         geometry = row.geometry.__geo_interface__
-        row_df = ohsome_api_v2.stats_features(
-            geojson_geometry=geometry,
-            filter_expr=filter_expr,
-            grouping_key=grouping_key,
-            measure=measure
-        )
-        row_df = row_df.copy()
-        row_df["id"] = row["id"]
-        plot_df = create_treemap(row_df)
-        new_rows.append(plot_df)
+        combined = {"id": row["id"]}
+        statuses = []
+
+        for measure in measures:
+            row_df = ohsome_api_v2.stats_features(
+                geojson_geometry=geometry,
+                filter_expr=filter_expr,
+                grouping_key=grouping_key,
+                measure=measure
+            )
+            row_df = row_df.copy()
+            row_df["id"] = row["id"]
+            measure_result = create_treemap(row_df, measure).iloc[0]
+
+            combined["timestamp"] = measure_result["timestamp"]
+            combined[f"treemap_{measure}"] = measure_result[f"treemap_{measure}"]
+            combined[f"sum_value_{measure}"] = measure_result[f"sum_value_{measure}"]
+            statuses.append((measure_result["status_code"], measure_result["description"]))
+
+        failed = next((s for s in statuses if s[0] != 200), None)
+        combined["status_code"] = failed[0] if failed else 200
+        combined["description"] = failed[1] if failed else None
+
+        new_rows.append(combined)
         logger.info(f"finished: {i + 1}/{len(gdf)}")
 
-    return pd.concat(new_rows, ignore_index=True)
+    return pd.DataFrame(new_rows)
 
 
-def create_treemap(row_df):
+def create_treemap(row_df, measure):
     df = row_df.copy()
     top = df.dropna(subset=["tagvalue"]).sort_values("value", ascending=False).head(6)
     remainder = df.dropna(subset=["tagvalue"])["value"].sum() - top["value"].sum()
@@ -50,9 +64,10 @@ def create_treemap(row_df):
         marker_line=dict(color="white", width=2)
     )
     fig.update_layout(autosize=True, margin=dict(t=5, l=5, r=5, b=5))
-    result = df.iloc[[0]].drop(columns="tagvalue")
-    result = result.drop(columns="value")
-    result["treemap"] = fig.to_json()
+    sum_value = df.dropna(subset=["tagvalue"])["value"].sum()
+    result = df.iloc[[0]].drop(columns=["tagvalue", "value"])
+    result[f"treemap_{measure}"] = fig.to_json()
+    result[f"sum_value_{measure}"] = sum_value
 
     return result
 
@@ -70,7 +85,7 @@ def get_stats_retry_ids(existing_df):
     return retry_ids, skip_ids
 
 
-def tag_distribution_requests(duckdb, gdf, ohsome_api_v2, topic, partition_key, filter_expr, grouping_key, measure):
+def tag_distribution_requests(duckdb, gdf, ohsome_api_v2, topic, partition_key, filter_expr, grouping_key, measures):
     logger.info(f"start ohsome API tag distribution queries for: {partition_key}, {topic}, {grouping_key}")
 
     indicator = "tag-distribution"
@@ -78,7 +93,7 @@ def tag_distribution_requests(duckdb, gdf, ohsome_api_v2, topic, partition_key, 
 
     if not table_exists:
         logger.info(f"No existing results, querying all {len(gdf)} rows")
-        df = request_loop(gdf, ohsome_api_v2, filter_expr, grouping_key, measure)
+        df = request_loop(gdf, ohsome_api_v2, filter_expr, grouping_key, measures)
     else:
         existing_df = duckdb.query_asset_results_df(
             partition_key, topic, indicator, grouping_key, attribute_column="grouping_key"
@@ -88,7 +103,7 @@ def tag_distribution_requests(duckdb, gdf, ohsome_api_v2, topic, partition_key, 
 
         if len(existing_df) == 0:
             logger.info(f"No existing results, querying all {len(gdf)} rows")
-            df = request_loop(gdf, ohsome_api_v2, filter_expr, grouping_key, measure)
+            df = request_loop(gdf, ohsome_api_v2, filter_expr, grouping_key, measures)
         elif n_existing_ids == len(gdf) and retry_ids.empty:
             logger.info("All rows already successful, skipping API calls")
             df = existing_df.copy()
@@ -97,7 +112,7 @@ def tag_distribution_requests(duckdb, gdf, ohsome_api_v2, topic, partition_key, 
             existing_df = existing_df.copy()
             existing_df["id"] = existing_df["id"].astype(str)
             retry_gdf = gdf[gdf["id"].isin(retry_ids["id"])]
-            new_df = request_loop(retry_gdf, ohsome_api_v2, filter_expr, grouping_key, measure)
+            new_df = request_loop(retry_gdf, ohsome_api_v2, filter_expr, grouping_key, measures)
             kept = existing_df[~existing_df["id"].isin(retry_ids["id"])]
             df = pd.concat([kept, new_df], ignore_index=True)
 
@@ -109,7 +124,7 @@ def tag_distribution_requests(duckdb, gdf, ohsome_api_v2, topic, partition_key, 
 def extract_yaml_info(topic):
     with open("src/osm_quality_pipeline/configs/tag_distribution_config.yaml", "r") as f:
         all_params = yaml.safe_load(f)
-    measure = all_params["topics"][topic]["measure"]
+    measures = all_params["topics"][topic]["measures"]
     filter_expr = all_params["topics"][topic]["filter_expr"]
     grouping_keys = all_params["topics"][topic]["grouping_keys"]
-    return measure, filter_expr, grouping_keys
+    return measures, filter_expr, grouping_keys
