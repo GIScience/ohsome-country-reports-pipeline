@@ -19,6 +19,7 @@ dependencies = [
     "hdx-python-api>=6.6.8",
     "pyarrow>=18.0.0",
     "plotly>=7.0.0",
+    "tippecanoe>=2.72.0",
 ]
 
 [project.optional-dependencies]
