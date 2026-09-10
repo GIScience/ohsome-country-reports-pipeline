@@ -92,6 +92,7 @@ TOPIC_ATTRIBUTES = {
 }
 
 STATIC_TOPIC_ASSETS = {
+    "buildings": ["building_comparison"],
     "land-cover": ["land_cover_completeness", "land_cover_thematic_accuracy"],
     "roads": ["roads_thematic_accuracy"],
 }

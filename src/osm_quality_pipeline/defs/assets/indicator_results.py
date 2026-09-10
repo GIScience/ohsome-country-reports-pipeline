@@ -35,6 +35,14 @@ ALL_TOPIC_DEPS = _get_all_topic_deps()
 
 ins = {dep: dg.AssetIn(key=dep) for dep in ALL_TOPIC_DEPS}
 
+TAG_DISTRIBUTION_ASSET_TO_TOPIC = {
+    f"{topic.replace('-', '_')}_tag_distribution": topic
+    for topic in TOPICS_BY_INDICATOR["tag-distribution"]
+}
+tag_distribution_ins = {
+    asset_name: dg.AssetIn(key=asset_name) for asset_name in TAG_DISTRIBUTION_ASSET_TO_TOPIC
+}
+
 @dg.asset(
     partitions_def=dynamic_country_layers_partition,
     group_name="outputs",
@@ -139,6 +147,51 @@ def indicator_results_parquet_s3(context: dg.AssetExecutionContext, s3: S3Resour
     layer = country_layer.layer
 
     parquet_path = f"{DATA_DIR}/{country_code}/{country_code}_{layer}_long.parquet"
+
+    long_df.to_parquet(parquet_path, index=False)
+
+    upload_file_to_s3(parquet_path, country_code, s3)
+
+
+def _melt_tag_distribution_df(df: pd.DataFrame, topic: str) -> pd.DataFrame:
+    measures = [col[len("treemap_"):] for col in df.columns if col.startswith("treemap_")]
+
+    long_frames = []
+    for measure in measures:
+        sub = df[["id", "grouping_key", "timestamp", f"treemap_{measure}", f"sum_value_{measure}"]].copy()
+        sub = sub.rename(columns={f"treemap_{measure}": "treemap", f"sum_value_{measure}": "sum_value"})
+        sub["measure"] = measure
+        long_frames.append(sub)
+
+    long_df = pd.concat(long_frames, ignore_index=True)
+    long_df["topic"] = topic
+    return long_df
+
+
+@dg.asset(
+    partitions_def=dynamic_country_layers_partition,
+    group_name="outputs",
+    ins=tag_distribution_ins
+)
+def tag_distribution_parquet_s3(context: dg.AssetExecutionContext, s3: S3Resource, **kwargs) -> None:
+    long_frames = [
+        _melt_tag_distribution_df(df, TAG_DISTRIBUTION_ASSET_TO_TOPIC[asset_name])
+        for asset_name, df in kwargs.items()
+        if df is not None
+    ]
+    if not long_frames:
+        return None
+
+    combined = pd.concat(long_frames, ignore_index=True)
+    long_df = combined.rename(columns={"id": "geomID"})[
+        ["geomID", "topic", "grouping_key", "measure", "timestamp", "treemap", "sum_value"]
+    ]
+
+    country_layer = get_country_layer_from_partitionkey(context.partition_key)
+    country_code = country_layer.country
+    layer = country_layer.layer
+
+    parquet_path = f"{DATA_DIR}/{country_code}/{country_code}_{layer}_tag_distribution.parquet"
 
     long_df.to_parquet(parquet_path, index=False)
 
