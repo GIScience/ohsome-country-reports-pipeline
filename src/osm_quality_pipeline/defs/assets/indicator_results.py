@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import dagster as dg
@@ -138,8 +139,9 @@ def indicator_results_parquet_s3(context: dg.AssetExecutionContext, s3: S3Resour
         else r["indicator"],
         axis=1,
     )
+    combined["figure"] = combined["figure"].apply(lambda f: json.dumps(f) if f is not None else None)
     long_df = combined.rename(columns={"id": "geomID"})[
-        ["geomID", "topic", "indicator", "value", "description", "quality_class"]
+        ["geomID", "topic", "indicator", "value", "description", "quality_class", "figure"]
     ]
 
     country_layer = get_country_layer_from_partitionkey(context.partition_key)
