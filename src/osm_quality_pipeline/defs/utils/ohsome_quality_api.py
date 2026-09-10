@@ -1,3 +1,4 @@
+import json
 from os.path import exists
 
 import dagster as dg
@@ -75,7 +76,11 @@ def build_dataframe(gdf, indicator, new_columns, topic):
     df["description"] = [col[4] for col in new_columns]
     df["quality_class"] = [col[5] for col in new_columns]
     df["osm_timestamp"] = [col[6] for col in new_columns]
-    df["figure"] = [col[7] for col in new_columns]
+    # Serialize to JSON immediately: figure shapes differ across indicators (a
+    # gauge chart vs. a scatter plot), and DuckDB can't unify heterogeneous
+    # dict/struct shapes across rows - it silently falls back to Python's
+    # str() repr (not valid JSON) if we hand it raw dicts here.
+    df["figure"] = [json.dumps(col[7]) if col[7] is not None else None for col in new_columns]
     return df
 
 

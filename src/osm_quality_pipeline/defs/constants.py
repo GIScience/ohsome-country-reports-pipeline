@@ -70,6 +70,9 @@ OHSOME_QUALITY_API_URL = os.getenv("OHSOME_QUALITY_API_URL", "https://api.heigit
 HEIGIT_API_KEY = os.getenv("HEIGIT_API_KEY", "foo")
 OHSOME_API_URL = os.getenv("OHSOME_API_URL", "https://api.heigit.org/ohsome-api/v2-rc")
 
+OHSOME_QUALITY_API_TIMEOUT = int(os.getenv("OHSOME_QUALITY_API_TIMEOUT", "120"))
+OHSOME_API_TIMEOUT = int(os.getenv("OHSOME_API_TIMEOUT", "180"))
+
 TOPICS_BY_INDICATOR = {
     "currentness": ["buildings", "roads", "land-cover", "schools", "hospitals"],
     "mapping-saturation": [

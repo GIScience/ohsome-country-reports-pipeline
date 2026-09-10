@@ -24,6 +24,8 @@ from osm_quality_pipeline.defs.constants import (
     OHSOME_QUALITY_API_URL,
     HEIGIT_API_KEY,
     OHSOME_API_URL,
+    OHSOME_QUALITY_API_TIMEOUT,
+    OHSOME_API_TIMEOUT,
 )
 
 
@@ -100,7 +102,7 @@ class OhsomeQualityApiResource(dg.ConfigurableResource):
             params["attributes"] = [attribute]
 
         try:
-            resp = r.post(url, json=params, headers=headers, timeout=120)
+            resp = r.post(url, json=params, headers=headers, timeout=OHSOME_QUALITY_API_TIMEOUT)
             api_quota_tracker.observe("ohsome_quality_api", resp.headers)
             resp.raise_for_status()
             row_results = extract_values_from_oqapi_response(resp)
@@ -138,7 +140,7 @@ class OhsomeApiResource(dg.ConfigurableResource):
         }
 
         try:
-            resp = r.post(url, json=params, headers=headers, timeout=180)
+            resp = r.post(url, json=params, headers=headers, timeout=OHSOME_API_TIMEOUT)
             api_quota_tracker.observe("ohsome_api", resp.headers)
             resp.raise_for_status()
 

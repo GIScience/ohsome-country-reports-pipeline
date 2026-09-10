@@ -1,3 +1,4 @@
+import ast
 import json
 from pathlib import Path
 
@@ -122,6 +123,39 @@ def indicator_results_gpkg_s3(context: dg.AssetExecutionContext, s3: S3Resource,
     upload_file_to_s3(gpkg_path, country_code, s3)
 
 
+def _normalize_figure(raw, _depth=0):
+    """Make "figure" a clean JSON string regardless of how DuckDB happened to
+    persist it: a real dict (rows with uniform figure shape - DuckDB unified
+    them into a struct), a corrupted Python repr string (heterogeneous shapes -
+    DuckDB fell back to str()), a JSON string wrapping either of those (rows
+    exported by an earlier, buggy version of this function), or already-clean
+    JSON (rows written after the ohsome_quality_api.py fix that serializes to
+    JSON up front). Recurses to unwrap however many layers of encoding got
+    stacked on before, stopping once it actually reaches a dict/list.
+    """
+    if raw is None or _depth > 3:
+        return None
+
+    if isinstance(raw, str):
+        try:
+            parsed = json.loads(raw)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            try:
+                parsed = ast.literal_eval(raw)
+            except (ValueError, SyntaxError):
+                return None
+        if isinstance(parsed, str):
+            return _normalize_figure(parsed, _depth + 1)
+        if isinstance(parsed, (dict, list)):
+            return json.dumps(parsed)
+        return None
+
+    if isinstance(raw, (dict, list)):
+        return json.dumps(raw)
+
+    return None
+
+
 @dg.asset(
     partitions_def=dynamic_country_layers_partition,
     group_name="outputs",
@@ -139,7 +173,7 @@ def indicator_results_parquet_s3(context: dg.AssetExecutionContext, s3: S3Resour
         else r["indicator"],
         axis=1,
     )
-    combined["figure"] = combined["figure"].apply(lambda f: json.dumps(f) if f is not None else None)
+    combined["figure"] = combined["figure"].apply(_normalize_figure)
     long_df = combined.rename(columns={"id": "geomID"})[
         ["geomID", "topic", "indicator", "value", "description", "quality_class", "figure"]
     ]
