@@ -7,7 +7,7 @@ import pandas as pd
 import dagster as dg
 import datetime
 
-from osm_quality_pipeline.defs.constants import DATA_DIR
+from osm_quality_pipeline.defs.constants import DATA_DIR, GEOMETRY_SIMPLIFY_TOLERANCE
 
 
 logger = dg.get_dagster_logger()
@@ -44,7 +44,8 @@ def load_layer_as_gdf(context, country, layer):
     layer_path = os.path.join(DATA_DIR, country, f"{country}_{layer}.gpkg")
     gdf = gpd.read_file(layer_path)
 
-    gdf.geometry = gdf.geometry.simplify(0.002)
+    logger.info(f"Simplifying geometry with tolerance {GEOMETRY_SIMPLIFY_TOLERANCE}")
+    gdf.geometry = gdf.geometry.simplify(GEOMETRY_SIMPLIFY_TOLERANCE)
 
     # drop all columns, but id and geometry
     columns = list(gdf.columns)

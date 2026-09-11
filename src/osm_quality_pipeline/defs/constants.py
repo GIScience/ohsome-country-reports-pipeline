@@ -73,6 +73,11 @@ OHSOME_API_URL = os.getenv("OHSOME_API_URL", "https://api.heigit.org/ohsome-api/
 OHSOME_QUALITY_API_TIMEOUT = int(os.getenv("OHSOME_QUALITY_API_TIMEOUT", "120"))
 OHSOME_API_TIMEOUT = int(os.getenv("OHSOME_API_TIMEOUT", "180"))
 
+# Tolerance (in degrees) for simplifying layer geometries before sending them to
+# the APIs. Larger, more complex boundaries (e.g. a whole-country polygon) can
+# cause the ohsome-quality-api to time out - bump this up if that happens.
+GEOMETRY_SIMPLIFY_TOLERANCE = float(os.getenv("GEOMETRY_SIMPLIFY_TOLERANCE", "0.002"))
+
 TOPICS_BY_INDICATOR = {
     "currentness": ["buildings", "roads", "land-cover", "schools", "hospitals"],
     "mapping-saturation": [
