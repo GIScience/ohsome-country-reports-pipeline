@@ -33,6 +33,13 @@ def log_curl_reproduction(url, headers, json_body):
     logger.warning(f"Reproduce with: {build_curl_command(url, headers, json_body)}")
 
 
+def log_api_response(resp, max_chars=2000):
+    body = resp.text
+    if len(body) > max_chars:
+        body = body[:max_chars] + f"... [truncated, {len(resp.text)} chars total]"
+    logger.warning(f"API response ({resp.status_code}): {body}")
+
+
 def load_layer_as_gdf(context, country, layer):
     layer_path = os.path.join(DATA_DIR, country, f"{country}_{layer}.gpkg")
     gdf = gpd.read_file(layer_path)
@@ -68,6 +75,7 @@ def empty_df(gdf, topic, indicator):
 def handle_http_error(geom_id, indicator, resp, topic, url, headers, params):
     logger.warning(f"API error {resp.status_code} for {topic}/{indicator} on {geom_id}")
     log_curl_reproduction(url, headers, params)
+    log_api_response(resp)
     row_results = [
         topic,
         indicator,
@@ -126,6 +134,7 @@ def empty_stats_df(status_code, description):
 def handle_stats_http_error(resp, url, headers, params):
     logger.warning(f"API error {resp.status_code} for tag distribution request")
     log_curl_reproduction(url, headers, params)
+    log_api_response(resp)
     return empty_stats_df(resp.status_code, resp.text)
 
 
