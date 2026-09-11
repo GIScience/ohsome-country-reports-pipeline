@@ -25,6 +25,11 @@ def _get_all_topic_deps() -> list[str]:
     for topic in ALL_TOPICS:
         topic_ = topic.replace("-", "_")
         for indicator, topics in TOPICS_BY_INDICATOR.items():
+            if indicator == "tag-distribution":
+                # tag_distribution assets have a different schema (no topic/
+                # indicator/value columns) and are exported separately via
+                # tag_distribution_parquet_s3 - they don't belong in ins below.
+                continue
             if topic in topics:
                 indicator_ = indicator.replace("-", "_")
                 deps.add(f"{topic_}_{indicator_}")
@@ -54,8 +59,8 @@ def indicator_results_csv_s3(context: dg.AssetExecutionContext, s3: S3Resource, 
     dfs = [df for df in kwargs.values() if df is not None]
     if not dfs:
         return None
-    
-    combined = pd.concat(dfs)
+
+    combined = pd.concat(dfs, ignore_index=True)
     combined = combined.drop("geometry", axis=1)
 
     country_layer = get_country_layer_from_partitionkey(context.partition_key)
@@ -80,7 +85,7 @@ def indicator_results_gpkg_s3(context: dg.AssetExecutionContext, s3: S3Resource,
     if not dfs:
         return None
 
-    combined = pd.concat(dfs)
+    combined = pd.concat(dfs, ignore_index=True)
     combined["geometry"] = gpd.GeoSeries.from_wkt(combined["geometry"])
 
     country_layer = get_country_layer_from_partitionkey(context.partition_key)
@@ -166,7 +171,7 @@ def indicator_results_parquet_s3(context: dg.AssetExecutionContext, s3: S3Resour
     if not dfs:
         return None
 
-    combined = pd.concat(dfs)
+    combined = pd.concat(dfs, ignore_index=True)
     combined["indicator"] = combined.apply(
         lambda r: f"{r['indicator']}_{r['attribute']}"
         if pd.notna(r.get("attribute"))
