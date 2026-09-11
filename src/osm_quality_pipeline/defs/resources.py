@@ -107,11 +107,11 @@ class OhsomeQualityApiResource(dg.ConfigurableResource):
             resp.raise_for_status()
             row_results = extract_values_from_oqapi_response(resp)
         except r.Timeout:
-            row_results = handle_timeout_error(geom_id, indicator, topic)
+            row_results = handle_timeout_error(geom_id, indicator, topic, url, headers, params)
         except r.ConnectionError:
-            row_results = handle_connection_error(geom_id, indicator, topic)
+            row_results = handle_connection_error(geom_id, indicator, topic, url, headers, params)
         except r.HTTPError:
-            row_results = handle_http_error(geom_id, indicator, resp, topic)
+            row_results = handle_http_error(geom_id, indicator, resp, topic, url, headers, params)
 
         return row_results
 
@@ -152,11 +152,11 @@ class OhsomeApiResource(dg.ConfigurableResource):
             df["status_code"] = 200
             df["description"] = None
         except r.Timeout:
-            df = handle_stats_timeout_error()
+            df = handle_stats_timeout_error(url, headers, params)
         except r.ConnectionError:
-            df = handle_stats_connection_error()
+            df = handle_stats_connection_error(url, headers, params)
         except r.HTTPError:
-            df = handle_stats_http_error(resp)
+            df = handle_stats_http_error(resp, url, headers, params)
 
         return df
 

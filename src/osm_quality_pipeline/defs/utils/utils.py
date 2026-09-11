@@ -1,4 +1,6 @@
+import json
 import os
+import shlex
 
 import geopandas as gpd
 import pandas as pd
@@ -9,6 +11,26 @@ from osm_quality_pipeline.defs.constants import DATA_DIR
 
 
 logger = dg.get_dagster_logger()
+
+
+def build_curl_command(url, headers, json_body):
+    """Build a copy-pasteable curl reproducing a failed request. The
+    Authorization header is emitted as a $HEIGIT_API_KEY shell variable
+    reference, never the real key, so nothing secret ends up in logs -
+    it resolves automatically if HEIGIT_API_KEY is exported in the shell
+    (e.g. via `set -a; source .env; set +a`)."""
+    parts = ["curl", "-X", "POST", shlex.quote(url)]
+    for key, value in headers.items():
+        if key.lower() == "authorization":
+            parts.append(f'-H "{key}: $HEIGIT_API_KEY"')
+        else:
+            parts.append(f"-H {shlex.quote(f'{key}: {value}')}")
+    parts.append(f"-d {shlex.quote(json.dumps(json_body))}")
+    return " ".join(parts)
+
+
+def log_curl_reproduction(url, headers, json_body):
+    logger.warning(f"Reproduce with: {build_curl_command(url, headers, json_body)}")
 
 
 def load_layer_as_gdf(context, country, layer):
@@ -43,8 +65,9 @@ def empty_df(gdf, topic, indicator):
     return df
 
 
-def handle_http_error(geom_id, indicator, resp, topic):
+def handle_http_error(geom_id, indicator, resp, topic, url, headers, params):
     logger.warning(f"API error {resp.status_code} for {topic}/{indicator} on {geom_id}")
+    log_curl_reproduction(url, headers, params)
     row_results = [
         topic,
         indicator,
@@ -58,8 +81,9 @@ def handle_http_error(geom_id, indicator, resp, topic):
     return row_results
 
 
-def handle_connection_error(geom_id, indicator, topic):
+def handle_connection_error(geom_id, indicator, topic, url, headers, params):
     logger.warning(f"Network failure for {topic}/{indicator} on {geom_id}")
+    log_curl_reproduction(url, headers, params)
     row_results = [
         topic,
         indicator,
@@ -73,8 +97,9 @@ def handle_connection_error(geom_id, indicator, topic):
     return row_results
 
 
-def handle_timeout_error(geom_id, indicator, topic):
+def handle_timeout_error(geom_id, indicator, topic, url, headers, params):
     logger.warning(f"Timeout for {topic}/{indicator} on {geom_id}")
+    log_curl_reproduction(url, headers, params)
     row_results = [
         topic,
         indicator,
@@ -98,18 +123,21 @@ def empty_stats_df(status_code, description):
     }])
 
 
-def handle_stats_http_error(resp):
+def handle_stats_http_error(resp, url, headers, params):
     logger.warning(f"API error {resp.status_code} for tag distribution request")
+    log_curl_reproduction(url, headers, params)
     return empty_stats_df(resp.status_code, resp.text)
 
 
-def handle_stats_timeout_error():
+def handle_stats_timeout_error(url, headers, params):
     logger.warning("Timeout for tag distribution request")
+    log_curl_reproduction(url, headers, params)
     return empty_stats_df(999, "Timeout Error")
 
 
-def handle_stats_connection_error():
+def handle_stats_connection_error(url, headers, params):
     logger.warning("Network failure for tag distribution request")
+    log_curl_reproduction(url, headers, params)
     return empty_stats_df(998, "Network Failure")
 
 
