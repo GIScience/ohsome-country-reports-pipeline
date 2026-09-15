@@ -247,7 +247,7 @@ def upload_file_to_s3(file_path: str, country_code:str, s3: S3Resource) -> None:
     s3_client.upload_file(
         Filename=file_path,
         Bucket=CONFIG.s3_config.bucket,
-        Key=f"oqapi_hdx/downloads/{country_code}/{file_name}"
+        Key=f"{CONFIG.s3_config.prefix}/{country_code}/{file_name}"
     )
 
 

@@ -12,7 +12,7 @@ logger = dg.get_dagster_logger()
 def get_s3_links(config, country, s3):
     response = s3.get_client().list_objects_v2(
         Bucket=config.bucket,
-        Prefix=f"oqapi_hdx/downloads/{country}/",
+        Prefix=f"{config.prefix}/{country}/",
     )
     # links_list = get_s3_links(country)
     links_list = [
