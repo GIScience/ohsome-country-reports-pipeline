@@ -31,7 +31,8 @@ def roads_thematic_accuracy(context: dg.AssetExecutionContext, duckdb: CustomDuc
 
     if country != "DEU":
         logger.info(f"Indicator is only available for DEU. Can't process for {country}.")
-        return empty_df(gdf, topic=TOPIC, indicator=INDICATOR)
+        df = empty_df(gdf, topic=TOPIC, indicator=INDICATOR)
+        is_valid = True
 
     df, is_valid = ohsome_quality_api_requests(
         duckdb=duckdb,
