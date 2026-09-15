@@ -75,6 +75,10 @@ class ApiQuotaTracker:
         if remaining is None or limit is None:
             return
 
+        if limit < 0:
+            # this is an unlimited key
+            return
+
         if reset != self._last_reset:
             self._last_reset = reset
             self._warned_low = False
