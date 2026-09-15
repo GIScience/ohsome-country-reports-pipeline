@@ -33,15 +33,15 @@ def roads_thematic_accuracy(context: dg.AssetExecutionContext, duckdb: CustomDuc
         logger.info(f"Indicator is only available for DEU. Can't process for {country}.")
         df = empty_df(gdf, topic=TOPIC, indicator=INDICATOR)
         is_valid = True
-
-    df, is_valid = ohsome_quality_api_requests(
-        duckdb=duckdb,
-        gdf=gdf,
-        topic=TOPIC,
-        indicator=INDICATOR,
-        partition_key=context.partition_key,
-        table_name=context.asset_key.path[-1]
-    )
+    else:
+        df, is_valid = ohsome_quality_api_requests(
+            duckdb=duckdb,
+            gdf=gdf,
+            topic=TOPIC,
+            indicator=INDICATOR,
+            partition_key=context.partition_key,
+            table_name=context.asset_key.path[-1]
+        )
 
     # First, materialize dataframe into DuckDB
     yield dg.MaterializeResult(value=df)
