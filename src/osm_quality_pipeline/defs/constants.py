@@ -21,10 +21,6 @@ REQUIRED_TOPICS = [
 
 ADM_LEVELS = ["ADM0", "ADM1"]
 
-BKG_BOUNDARY_URL = (
-    "https://daten.gdz.bkg.bund.de/produkte/vg/vg25_ebenen/aktuell/vg25.utm32s.gpkg.zip"
-)
-
 
 class S3Config(dg.Config):
     host: str = os.getenv("S3_HOST")
@@ -45,9 +41,6 @@ def get_hdx_config():
 
 
 class BoundaryConfig(dg.Config):
-    bkg_boundary_url: str = (
-        f"https://storage.heigit.org/heigit-hdx-public/ohsome-quality-country-reports/boundaries"
-    )
     bkg_boundary_levels: [str] = ["vg2500_sta", "vg2500_lan", "vg1000_krs", "vg25_gem"]
     geoboundaries_levels: [str] = ["ADM0", "ADM1"]
 
