@@ -18,6 +18,7 @@ services:
       OHSOME_QUALITY_API_TIMEOUT: 180
       OHSOME_API_TIMEOUT: 180
       GEOMETRY_SIMPLIFY_TOLERANCE: 0.002
+      TIPPECANOE_MAX_THREADS: 8
     command: uv run dagster dev -h 0.0.0.0 --port $DAGSTER_PORT
 
 volumes:
