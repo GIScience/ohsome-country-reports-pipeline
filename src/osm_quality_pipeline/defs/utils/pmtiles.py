@@ -36,17 +36,19 @@ def geojson_to_multilayer_pmtiles(layers: dict, pmtiles_path: str, minzoom: int 
         "tippecanoe",
         "-o", pmtiles_path,
         "--force",
-        "-Z", str(minzoom),
         "-z", str(maxzoom),
         "--drop-densest-as-needed",
         "--extend-zooms-if-still-dropping",
         # At low zoom, aggressive default simplification can carve spurious grey
         # notches into complex district borders that vanish again at high zoom.
-        # --detect-shared-borders keeps neighboring polygons' shared edges
-        # consistent, and a lower --simplification keeps more boundary detail.
-        "--detect-shared-borders",
-        "--simplification=5",
         *layer_args,
+        "-z12",
+        "-B4",  # Base zoom: Keep all details visible from zoom 4 downwards
+        # --- PREVENT DATA LOSS ---
+        "--no-feature-limit",  # Never drop features because there are "too many"
+        "--no-tile-size-limit",  # Allow tiles to be bigger than 500kb
+        "--no-tiny-polygon-reduction",  # Don't delete small polygons
+        "--no-line-simplification",
     ]
 
     try:
