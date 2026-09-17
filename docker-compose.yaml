@@ -1,0 +1,25 @@
+services:
+  osm-country-reports:
+    build: .
+    volumes:
+      - dagster-osm-country-reports:/data/dagster
+    ports:
+      - "$DAGSTER_PORT:$DAGSTER_PORT"
+    environment:
+      DAGSTER_HOME: "/data/dagster/home"
+      DAGSTER_DATA_DIR: "/data/dagster/data"
+      S3_KEY_ID: "$S3_KEY_ID"
+      S3_SECRET: "$S3_SECRET"
+      S3_HOST: "$S3_HOST"
+      S3_BUCKET: "$S3_BUCKET"
+      OHSOME_QUALITY_API_URL: "$OHSOME_QUALITY_API_URL"
+      OHSOME_API_URL: "$OHSOME_API_URL"
+      HEIGIT_API_KEY: "$HEIGIT_API_KEY"
+      OHSOME_QUALITY_API_TIMEOUT: 180
+      OHSOME_API_TIMEOUT: 180
+      GEOMETRY_SIMPLIFY_TOLERANCE: 0.002
+      TIPPECANOE_MAX_THREADS: 8
+    command: uv run dagster dev -h 0.0.0.0 --port $DAGSTER_PORT
+
+volumes:
+  dagster-osm-country-reports:

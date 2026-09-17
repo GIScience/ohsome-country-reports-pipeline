@@ -1,0 +1,63 @@
+[project]
+name = "osm_quality_pipeline"
+version = "0.0.1"
+description = "osm_quality_pipeline"
+readme = "README.md"
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "dagster==1.12.4",
+    "dagster-dg-cli",
+    "dagster-webserver",
+    "requests>=2.32.5",
+    "pyyaml>=6.0",
+    "pandas>=2.3.3",
+    "geopandas>=1.1.3",
+    "h3>=4.5.0",
+    "dagster-aws>=0.28.4",
+    "dagster-duckdb-pandas>=0.28.4",
+    "pydantic-settings>=2.14.2",
+    "hdx-python-api>=6.6.8",
+    "pyarrow>=18.0.0",
+    "plotly>=7.0.0",
+    "tippecanoe>=2.72.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff",
+    "pytest",
+]
+
+[dependency-groups]
+dev = [
+    "ruff",
+    "pytest",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/osm_quality_pipeline"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.dg]
+directory_type = "project"
+
+[tool.dg.project]
+root_module = "osm_quality_pipeline"
+registry_modules = [
+    "osm_quality_pipeline.defs.*",
+]
+
+[tool.ruff.lint]
+ignore = [
+    "ERA001", # comments are fine for a learning environment
+    "E501",   # Line too long for docstrings
+    "F401",   # unused imports already caught by pylance
+]
+
+fixable = ["ALL"]
+unfixable = [
+    "F401", # dont remove unused imports
+]

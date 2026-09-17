@@ -114,3 +114,5 @@ build/
 
 # but keep the dagster.yaml file
 !.dagster/dagster.yaml
+
+.tmp*/

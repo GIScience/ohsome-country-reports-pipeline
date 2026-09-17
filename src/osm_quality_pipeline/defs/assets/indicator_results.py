@@ -1,0 +1,253 @@
+import ast
+import json
+from pathlib import Path
+
+import dagster as dg
+import geopandas as gpd
+import pandas as pd
+
+from osm_quality_pipeline.defs.resources import S3Resource
+from osm_quality_pipeline.defs.constants import CONFIG, DATA_DIR
+
+from osm_quality_pipeline.defs.constants import (
+    ALL_TOPICS,
+    STATIC_TOPIC_ASSETS,
+    TOPICS_BY_INDICATOR,
+)
+from osm_quality_pipeline.defs.partitions import (
+    dynamic_country_layers_partition,
+    get_country_layer_from_partitionkey,
+)
+
+
+def _get_all_topic_deps() -> list[str]:
+    deps = set()
+    for topic in ALL_TOPICS:
+        topic_ = topic.replace("-", "_")
+        for indicator, topics in TOPICS_BY_INDICATOR.items():
+            if indicator == "tag-distribution":
+                # tag_distribution assets have a different schema (no topic/
+                # indicator/value columns) and are exported separately via
+                # tag_distribution_parquet_s3 - they don't belong in ins below.
+                continue
+            if topic in topics:
+                indicator_ = indicator.replace("-", "_")
+                deps.add(f"{topic_}_{indicator_}")
+        for dep in STATIC_TOPIC_ASSETS.get(topic, []):
+            deps.add(dep)
+    return sorted(deps)
+
+
+ALL_TOPIC_DEPS = _get_all_topic_deps()
+
+ins = {dep: dg.AssetIn(key=dep) for dep in ALL_TOPIC_DEPS}
+
+TAG_DISTRIBUTION_ASSET_TO_TOPIC = {
+    f"{topic.replace('-', '_')}_tag_distribution": topic
+    for topic in TOPICS_BY_INDICATOR["tag-distribution"]
+}
+tag_distribution_ins = {
+    asset_name: dg.AssetIn(key=asset_name) for asset_name in TAG_DISTRIBUTION_ASSET_TO_TOPIC
+}
+
+@dg.asset(
+    partitions_def=dynamic_country_layers_partition,
+    group_name="outputs",
+    ins=ins
+)
+def indicator_results_csv_s3(context: dg.AssetExecutionContext, s3: S3Resource, **kwargs) -> None:
+    dfs = [df for df in kwargs.values() if df is not None]
+    if not dfs:
+        return None
+
+    combined = pd.concat(dfs, ignore_index=True)
+    combined = combined.drop("geometry", axis=1)
+
+    country_layer = get_country_layer_from_partitionkey(context.partition_key)
+    country_code = country_layer.country
+    layer = country_layer.layer
+
+
+    csv_path = f"{DATA_DIR}/{country_code}/{country_code}_{layer}_indicator_results.csv"
+
+    combined.to_csv(csv_path, encoding='utf-8', index=False)
+
+    upload_file_to_s3(csv_path, country_code, s3)
+
+
+@dg.asset(
+    partitions_def=dynamic_country_layers_partition,
+    group_name="outputs",
+    ins=ins
+)
+def indicator_results_gpkg_s3(context: dg.AssetExecutionContext, s3: S3Resource, **kwargs) -> None:
+    dfs = [df for df in kwargs.values() if df is not None]
+    if not dfs:
+        return None
+
+    combined = pd.concat(dfs, ignore_index=True)
+    combined["geometry"] = gpd.GeoSeries.from_wkt(combined["geometry"])
+
+    country_layer = get_country_layer_from_partitionkey(context.partition_key)
+    country_code = country_layer.country
+    layer = country_layer.layer
+
+    gpkg_path = f"{DATA_DIR}/{country_code}/{country_code}_{layer}_indicator_results.gpkg"
+
+    for topic in ALL_TOPICS:
+        topic_gdf = combined[combined["topic"] == topic]
+        if topic_gdf.empty:
+            continue
+
+        topic_ = topic.replace("-", "_")
+
+        topic_gdf["indicator_key"] = topic_gdf.apply(
+            lambda r: f"{r['indicator']}_{r['attribute']}"
+            if pd.notna(r.get("attribute"))
+            else r["indicator"],
+            axis=1,
+        )
+        wide = topic_gdf.pivot(
+            index="id",
+            columns="indicator_key",
+            values=["value", "description", "quality_class"]
+        )
+        wide.columns = wide.columns.swaplevel(0, 1)
+        wide = wide.sort_index(axis=1, level=0)
+
+        wide.columns = [f"{ind}_{col}" for col, ind in wide.columns]
+        wide = wide.reset_index()
+
+        geom_map = topic_gdf[["id", "geometry"]].drop_duplicates("id")
+        wide = wide.merge(geom_map, on="id", how="left")
+
+        wide_gdf = gpd.GeoDataFrame(wide, geometry="geometry", crs="EPSG:4326")
+        wide_gdf.to_file(gpkg_path, layer=topic_, driver="GPKG", mode="w")
+        
+
+    upload_file_to_s3(gpkg_path, country_code, s3)
+
+
+def _normalize_figure(raw, _depth=0):
+    """Make "figure" a clean JSON string regardless of how DuckDB happened to
+    persist it: a real dict (rows with uniform figure shape - DuckDB unified
+    them into a struct), a corrupted Python repr string (heterogeneous shapes -
+    DuckDB fell back to str()), a JSON string wrapping either of those (rows
+    exported by an earlier, buggy version of this function), or already-clean
+    JSON (rows written after the ohsome_quality_api.py fix that serializes to
+    JSON up front). Recurses to unwrap however many layers of encoding got
+    stacked on before, stopping once it actually reaches a dict/list.
+    """
+    if raw is None or _depth > 3:
+        return None
+
+    if isinstance(raw, str):
+        try:
+            parsed = json.loads(raw)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            try:
+                parsed = ast.literal_eval(raw)
+            except (ValueError, SyntaxError):
+                return None
+        if isinstance(parsed, str):
+            return _normalize_figure(parsed, _depth + 1)
+        if isinstance(parsed, (dict, list)):
+            return json.dumps(parsed)
+        return None
+
+    if isinstance(raw, (dict, list)):
+        return json.dumps(raw)
+
+    return None
+
+
+@dg.asset(
+    partitions_def=dynamic_country_layers_partition,
+    group_name="outputs",
+    ins=ins
+)
+def indicator_results_parquet_s3(context: dg.AssetExecutionContext, s3: S3Resource, **kwargs) -> None:
+    dfs = [df for df in kwargs.values() if df is not None]
+    if not dfs:
+        return None
+
+    combined = pd.concat(dfs, ignore_index=True)
+    combined["indicator"] = combined.apply(
+        lambda r: f"{r['indicator']}_{r['attribute']}"
+        if pd.notna(r.get("attribute"))
+        else r["indicator"],
+        axis=1,
+    )
+    combined["figure"] = combined["figure"].apply(_normalize_figure)
+    long_df = combined.rename(columns={"id": "geomID"})[
+        ["geomID", "topic", "indicator", "value", "description", "quality_class", "figure"]
+    ]
+
+    country_layer = get_country_layer_from_partitionkey(context.partition_key)
+    country_code = country_layer.country
+    layer = country_layer.layer
+
+    parquet_path = f"{DATA_DIR}/{country_code}/{country_code}_{layer}_long.parquet"
+
+    long_df.to_parquet(parquet_path, index=False)
+
+    upload_file_to_s3(parquet_path, country_code, s3)
+
+
+def _melt_tag_distribution_df(df: pd.DataFrame, topic: str) -> pd.DataFrame:
+    measures = [col[len("treemap_"):] for col in df.columns if col.startswith("treemap_")]
+
+    long_frames = []
+    for measure in measures:
+        sub = df[["id", "grouping_key", "timestamp", f"treemap_{measure}", f"sum_value_{measure}"]].copy()
+        sub = sub.rename(columns={f"treemap_{measure}": "treemap", f"sum_value_{measure}": "sum_value"})
+        sub["measure"] = measure
+        long_frames.append(sub)
+
+    long_df = pd.concat(long_frames, ignore_index=True)
+    long_df["topic"] = topic
+    return long_df
+
+
+@dg.asset(
+    partitions_def=dynamic_country_layers_partition,
+    group_name="outputs",
+    ins=tag_distribution_ins
+)
+def tag_distribution_parquet_s3(context: dg.AssetExecutionContext, s3: S3Resource, **kwargs) -> None:
+    long_frames = [
+        _melt_tag_distribution_df(df, TAG_DISTRIBUTION_ASSET_TO_TOPIC[asset_name])
+        for asset_name, df in kwargs.items()
+        if df is not None
+    ]
+    if not long_frames:
+        return None
+
+    combined = pd.concat(long_frames, ignore_index=True)
+    long_df = combined.rename(columns={"id": "geomID"})[
+        ["geomID", "topic", "grouping_key", "measure", "timestamp", "treemap", "sum_value"]
+    ]
+
+    country_layer = get_country_layer_from_partitionkey(context.partition_key)
+    country_code = country_layer.country
+    layer = country_layer.layer
+
+    parquet_path = f"{DATA_DIR}/{country_code}/{country_code}_{layer}_tag_distribution.parquet"
+
+    long_df.to_parquet(parquet_path, index=False)
+
+    upload_file_to_s3(parquet_path, country_code, s3)
+
+
+def upload_file_to_s3(file_path: str, country_code:str, s3: S3Resource) -> None:
+    s3_client = s3.get_client()
+
+    file_name = Path(file_path).name
+
+    s3_client.upload_file(
+        Filename=file_path,
+        Bucket=CONFIG.s3_config.bucket,
+        Key=f"{CONFIG.s3_config.prefix}/{country_code}/{file_name}"
+    )
+
+
