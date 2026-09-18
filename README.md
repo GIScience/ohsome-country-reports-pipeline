@@ -1,5 +1,7 @@
 # OSM-QUALITY-COUNTRY-REPORTS
 
+Live here: https://giscience.github.io/osm-quality-country-reports/
+
 ## Install the dependencies
 
 Make sure that you set the `DAGSTER_HOME` in an `.env` file like it's done in `.example.env`.
