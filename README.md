@@ -1,4 +1,4 @@
-# OSM-QUALITY-COUNTRY-REPORTS
+# ohsome-country-reports-pipeline
 
 Live here: https://giscience.github.io/osm-quality-country-reports/
 
