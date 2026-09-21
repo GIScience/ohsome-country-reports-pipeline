@@ -46,13 +46,13 @@ def get_dynamic_resolutions(gdf):
 
     # 2. Define smart defaults based on area (same thresholds as before)
     if area_km2 < 50_000:
-        smart_sq, smart_h3 = 0.05, 6
+        smart_sq, smart_h3 = 0.05, 5
     elif area_km2 < 500_000:
-        smart_sq, smart_h3 = 0.1, 5
+        smart_sq, smart_h3 = 0.1, 4
     elif area_km2 < 5_000_000:
-        smart_sq, smart_h3 = 0.3, 4
+        smart_sq, smart_h3 = 0.3, 3
     else:
-        smart_sq, smart_h3 = 0.8, 3
+        smart_sq, smart_h3 = 0.8, 2
 
     # 3. Extract overrides from the 'grids' config block
     conf_h3 = H3_ZOOM_LEVEL
