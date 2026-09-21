@@ -43,6 +43,10 @@ def request_loop(gdf, ohsome_api_v2, filter_expr, grouping_key, measures):
 
 def create_treemap(row_df, measure):
     df = row_df.copy()
+
+    # calculate based on total, not only where attribute is present
+    sum_value = df[df['group'].isna()]["value"].values[0]
+
     top = df.dropna(subset=["group"]).sort_values("value", ascending=False).head(6)
     remainder = df.dropna(subset=["group"])["value"].sum() - top["value"].sum()
 
@@ -51,12 +55,19 @@ def create_treemap(row_df, measure):
     if remainder > 0:
         plot_df.loc[len(plot_df)] = ["remainder", remainder]
 
+    no_data = sum_value - plot_df["value"].sum()
+    if no_data > 0:
+        # add no data value to tree map plot
+        plot_df.loc[len(plot_df)] = ["no data", no_data]
+
+    plot_df["group"] = plot_df["group"].astype(str)
+
     fig = px.treemap(
         plot_df,
         path=["group"],
         values="value",
         color="group",
-        color_discrete_map={"remainder": "#929292"}
+        color_discrete_map={"remainder": "#929292", "no data": "#F5F5F5"}
     )
 
     fig.update_traces(
@@ -64,14 +75,12 @@ def create_treemap(row_df, measure):
         marker_line=dict(color="white", width=2)
     )
     fig.update_layout(autosize=True, margin=dict(t=5, l=5, r=5, b=5))
-    sum_value = df.dropna(subset=["group"])["value"].sum()
+
     result = df.iloc[[0]].drop(columns=["group", "value"])
     result[f"treemap_{measure}"] = fig.to_json()
     result[f"sum_value_{measure}"] = sum_value
 
     return result
-
-
 
 
 def get_stats_retry_ids(existing_df):
