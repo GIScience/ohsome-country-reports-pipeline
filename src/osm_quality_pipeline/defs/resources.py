@@ -109,6 +109,10 @@ class OhsomeQualityApiResource(dg.ConfigurableResource):
 
                 if resp.status_code == 500 and attempt < max_attempts:
                     continue  # retry once
+                elif resp.status_code == 422 and attempt < max_attempts:
+                    error_message = resp.json()
+                    if error_message["detail"][0] == {"msg": "Querying the ohsome API failed!"}:
+                        continue
 
                 resp.raise_for_status()
                 row_results = extract_values_from_oqapi_response(resp)
