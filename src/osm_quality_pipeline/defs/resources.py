@@ -101,17 +101,23 @@ class OhsomeQualityApiResource(dg.ConfigurableResource):
         if indicator == "attribute-completeness":
             params["attributes"] = [attribute]
 
-        try:
-            resp = r.post(url, json=params, headers=headers, timeout=OHSOME_QUALITY_API_TIMEOUT)
-            api_quota_tracker.observe("ohsome_quality_api", resp.headers)
-            resp.raise_for_status()
-            row_results = extract_values_from_oqapi_response(resp)
-        except r.Timeout:
-            row_results = handle_timeout_error(geom_id, indicator, topic, url, headers, params)
-        except r.ConnectionError:
-            row_results = handle_connection_error(geom_id, indicator, topic, url, headers, params)
-        except r.HTTPError:
-            row_results = handle_http_error(geom_id, indicator, resp, topic, url, headers, params)
+        max_attempts = 2  # initial try + 1 retry
+        for attempt in range(1, max_attempts + 1):
+            try:
+                resp = r.post(url, json=params, headers=headers, timeout=OHSOME_QUALITY_API_TIMEOUT)
+                api_quota_tracker.observe("ohsome_quality_api", resp.headers)
+
+                if resp.status_code == 500 and attempt < max_attempts:
+                    continue  # retry once
+
+                resp.raise_for_status()
+                row_results = extract_values_from_oqapi_response(resp)
+            except r.Timeout:
+                row_results = handle_timeout_error(geom_id, indicator, topic, url, headers, params)
+            except r.ConnectionError:
+                row_results = handle_connection_error(geom_id, indicator, topic, url, headers, params)
+            except r.HTTPError:
+                row_results = handle_http_error(geom_id, indicator, resp, topic, url, headers, params)
 
         return row_results
 
