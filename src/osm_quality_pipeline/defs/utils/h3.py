@@ -1,4 +1,5 @@
 import os
+import dagster as dg
 
 import geopandas as gpd
 import h3
@@ -6,6 +7,8 @@ import pandas as pd
 from shapely.geometry import shape, box
 
 from osm_quality_pipeline.defs.constants import H3_ZOOM_LEVEL
+
+logger = dg.get_dagster_logger()
 
 
 def create_h3_gdf(gdf, country):
@@ -46,19 +49,23 @@ def get_dynamic_resolutions(gdf):
 
     # 2. Define smart defaults based on area (same thresholds as before)
     if area_km2 < 50_000:
-        smart_sq, smart_h3 = 0.05, 5
+        smart_h3 = 5
     elif area_km2 < 500_000:
-        smart_sq, smart_h3 = 0.1, 4
+        smart_h3 = 4
     elif area_km2 < 5_000_000:
-        smart_sq, smart_h3 = 0.3, 3
+        smart_h3 = 3
     else:
-        smart_sq, smart_h3 = 0.8, 2
+        smart_h3 = 2
 
     # 3. Extract overrides from the 'grids' config block
     conf_h3 = H3_ZOOM_LEVEL
 
+    h3_res = conf_h3 if conf_h3 is not None else smart_h3
+
+    logger.info(f"Area: {area_km2} km². Using h3 resolution: {h3_res}")
+
     return {
-        "h3": conf_h3 if conf_h3 is not None else smart_h3,
+        "h3": h3_res,
     }
 
 
