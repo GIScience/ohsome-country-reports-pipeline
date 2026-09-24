@@ -17,7 +17,7 @@ from osm_quality_pipeline.defs.utils.utils import (
     handle_stats_connection_error,
     extract_values_from_oqapi_response,
 )
-from osm_quality_pipeline.defs.utils.rate_limiter import ApiQuotaTracker
+from osm_quality_pipeline.defs.utils.rate_limiter import ApiQuotaTracker, ApiRateLimiter
 from osm_quality_pipeline.defs.constants import (
     CONFIG,
     DATA_DIR,
@@ -26,10 +26,30 @@ from osm_quality_pipeline.defs.constants import (
     OHSOME_API_URL,
     OHSOME_QUALITY_API_TIMEOUT,
     OHSOME_API_TIMEOUT,
+    OHSOME_QUALITY_API_MAX_PER_MINUTE,
+    OHSOME_QUALITY_API_MAX_PER_DAY,
+    OHSOME_API_MAX_PER_MINUTE,
+    OHSOME_API_MAX_PER_DAY,
 )
 
 
-api_quota_tracker = ApiQuotaTracker(db_path=f"{DATA_DIR}/rate_limits.sqlite")
+RATE_LIMITER_DB_PATH = f"{DATA_DIR}/rate_limits.sqlite"
+
+api_quota_tracker = ApiQuotaTracker(db_path=RATE_LIMITER_DB_PATH)
+
+oqapi_rate_limiter = ApiRateLimiter(
+    db_path=RATE_LIMITER_DB_PATH,
+    api_name="ohsome_quality_api",
+    max_per_minute=OHSOME_QUALITY_API_MAX_PER_MINUTE,
+    max_per_day=OHSOME_QUALITY_API_MAX_PER_DAY,
+)
+
+ohsome_api_rate_limiter = ApiRateLimiter(
+    db_path=RATE_LIMITER_DB_PATH,
+    api_name="ohsome_api",
+    max_per_minute=OHSOME_API_MAX_PER_MINUTE,
+    max_per_day=OHSOME_API_MAX_PER_DAY,
+)
 
 
 duckdb_io_manager = DuckDBPandasIOManager(
@@ -103,9 +123,10 @@ class OhsomeQualityApiResource(dg.ConfigurableResource):
 
         max_attempts = 2  # initial try + 1 retry
         for attempt in range(1, max_attempts + 1):
+            request_id = oqapi_rate_limiter.acquire()
             try:
                 resp = r.post(url, json=params, headers=headers, timeout=OHSOME_QUALITY_API_TIMEOUT)
-                api_quota_tracker.observe("ohsome_quality_api", resp.headers)
+                api_quota_tracker.observe("ohsome_quality_api", resp.headers, request_id)
 
                 if resp.status_code == 500 and attempt < max_attempts:
                     continue  # retry once
@@ -149,9 +170,10 @@ class OhsomeApiResource(dg.ConfigurableResource):
             "groupBy": {"type": "byTag", "key": grouping_key}
         }
 
+        request_id = ohsome_api_rate_limiter.acquire()
         try:
             resp = r.post(url, json=params, headers=headers, timeout=OHSOME_API_TIMEOUT)
-            api_quota_tracker.observe("ohsome_api", resp.headers)
+            api_quota_tracker.observe("ohsome_api", resp.headers, request_id)
             resp.raise_for_status()
 
             df = pd.read_csv(

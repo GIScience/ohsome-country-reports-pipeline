@@ -60,12 +60,23 @@ DATA_DIR = Path(os.getenv("DAGSTER_DATA_DIR"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
-OHSOME_QUALITY_API_URL = os.getenv("OHSOME_QUALITY_API_URL", "https://api.heigit.org/ohsome-quality-api/v2")
+OHSOME_QUALITY_API_URL = os.getenv("OHSOME_QUALITY_API_URL", "https://api.heigit.org/ohsome-quality-api-staging/v2")
 HEIGIT_API_KEY = os.getenv("HEIGIT_API_KEY", "foo")
-OHSOME_API_URL = os.getenv("OHSOME_API_URL", "https://api.heigit.org/ohsome-api/v2-rc")
+OHSOME_API_URL = os.getenv("OHSOME_API_URL", "https://api.heigit.org/ohsome-api-staging/v2")
 
 OHSOME_QUALITY_API_TIMEOUT = int(os.getenv("OHSOME_QUALITY_API_TIMEOUT", "120"))
 OHSOME_API_TIMEOUT = int(os.getenv("OHSOME_API_TIMEOUT", "180"))
+
+
+def _int_or_none(value):
+    return int(value) if value else None
+
+
+# optional user-defined request caps, empty = unlimited
+OHSOME_QUALITY_API_MAX_PER_MINUTE = _int_or_none(os.getenv("OHSOME_QUALITY_API_MAX_PER_MINUTE"))
+OHSOME_QUALITY_API_MAX_PER_DAY = _int_or_none(os.getenv("OHSOME_QUALITY_API_MAX_PER_DAY"))
+OHSOME_API_MAX_PER_MINUTE = _int_or_none(os.getenv("OHSOME_API_MAX_PER_MINUTE"))
+OHSOME_API_MAX_PER_DAY = _int_or_none(os.getenv("OHSOME_API_MAX_PER_DAY"))
 
 TOPICS_BY_INDICATOR = {
     "currentness": ["buildings", "roads", "land-cover", "schools", "hospitals"],

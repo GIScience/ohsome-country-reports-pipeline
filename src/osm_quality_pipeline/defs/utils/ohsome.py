@@ -5,10 +5,13 @@ import pandas as pd
 import yaml
 import plotly.express as px
 
+from osm_quality_pipeline.defs.resources import ohsome_api_rate_limiter
+
 logger = dg.get_dagster_logger()
 
 
 def request_loop(gdf, ohsome_api_v2, filter_expr, grouping_key, measures):
+    ohsome_api_rate_limiter.log_remaining(len(gdf) * len(measures))
     new_rows = []
     for i, (_, row) in enumerate(gdf.iterrows()):
         geometry = row.geometry.__geo_interface__
