@@ -1,8 +1,8 @@
 services:
-  osm-country-reports:
+  ohsome-country-reports:
     build: .
     volumes:
-      - dagster-osm-country-reports:/data/dagster
+      - dagster-ohsome-country-reports:/data/dagster
     ports:
       - "$DAGSTER_PORT:$DAGSTER_PORT"
     environment:
@@ -17,9 +17,12 @@ services:
       HEIGIT_API_KEY: "$HEIGIT_API_KEY"
       OHSOME_QUALITY_API_TIMEOUT: 180
       OHSOME_API_TIMEOUT: 180
-      GEOMETRY_SIMPLIFY_TOLERANCE: 0.002
+      OHSOME_QUALITY_API_MAX_PER_MINUTE: "$OHSOME_QUALITY_API_MAX_PER_MINUTE"
+      OHSOME_QUALITY_API_MAX_PER_DAY: "$OHSOME_QUALITY_API_MAX_PER_DAY"
+      OHSOME_API_MAX_PER_MINUTE: "$OHSOME_API_MAX_PER_MINUTE"
+      OHSOME_API_MAX_PER_DAY: "$OHSOME_API_MAX_PER_DAY"
       TIPPECANOE_MAX_THREADS: 8
     command: uv run dagster dev -h 0.0.0.0 --port $DAGSTER_PORT
 
 volumes:
-  dagster-osm-country-reports:
+  dagster-ohsome-country-reports:
