@@ -119,7 +119,8 @@ class OhsomeQualityApiResource(dg.ConfigurableResource):
         headers = {
             "Accept": "application/json",
             "Content-Type": "application/json",
-            "Authorization": HEIGIT_API_KEY
+            "Authorization": HEIGIT_API_KEY,
+            'User-Agent': 'ohsome-country-reports-dagster',
         }
 
         params = {
@@ -169,7 +170,8 @@ class OhsomeApiResource(dg.ConfigurableResource):
         headers = {
             "Accept": "application/json",
             "Content-Type": "application/json",
-            "Authorization": HEIGIT_API_KEY
+            "Authorization": HEIGIT_API_KEY,
+            'User-Agent': 'ohsome-country-reports-dagster',
         }
 
         params = {
