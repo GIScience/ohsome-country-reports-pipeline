@@ -1,0 +1,38 @@
+# Countries processed one after another by the country_sweep_sensor.
+# This file is re-read on every sensor tick, changes apply without a restart.
+
+# true: recompute all indicator results from scratch (first attempt only,
+# the retry of a failed run only re-queries the failed rows)
+overwrite: false
+
+# iso: ISO3 code as in countries.yaml
+# h3:  also build and process the h3 hexagon layer
+countries:
+  - {iso: SSD, h3: true}  # South Sudan
+  - {iso: UGA, h3: true}  # Uganda
+  - {iso: TZA, h3: true}  # Tanzania
+  - {iso: KEN, h3: true}  # Kenya
+  - {iso: LBR, h3: true}  # Liberia
+  - {iso: GIN, h3: true}  # Guinea
+  - {iso: MMR, h3: true}  # Myanmar
+  - {iso: MDG, h3: true}  # Madagascar
+  - {iso: PNG, h3: true}  # Papua New Guinea
+  - {iso: TLS, h3: true}  # Timor-Leste
+  - {iso: DEU, h3: true}  # Germany
+  - {iso: COD, h3: true}  # DR Congo
+  - {iso: MOZ, h3: true}  # Mozambique
+  - {iso: MWI, h3: true}  # Malawi
+  - {iso: SLE, h3: true}  # Sierra Leone
+  - {iso: ETH, h3: true}  # Ethiopia
+  - {iso: SOM, h3: true}  # Somalia
+  - {iso: SDN, h3: true}  # Sudan
+  - {iso: CAF, h3: true}  # Central African Republic
+  - {iso: NGA, h3: true}  # Nigeria
+  - {iso: BGD, h3: true}  # Bangladesh
+  - {iso: NPL, h3: true}  # Nepal
+  - {iso: PHL, h3: true}  # Philippines
+  - {iso: AFG, h3: true}  # Afghanistan
+  - {iso: YEM, h3: true}  # Yemen
+  - {iso: HTI, h3: true}  # Haiti
+  - {iso: SLB, h3: true}  # Solomon Islands
+  - {iso: VUT, h3: true}  # Vanuatu

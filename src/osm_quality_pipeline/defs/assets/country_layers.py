@@ -33,6 +33,16 @@ def country_layers(context, config: BoundaryConfig, s3: S3Resource) -> dg.Materi
     else:
         updated_partitions = country_layers_osm(context, config, country, out_dir)
 
+    # drop partitions of this country that are no longer produced (e.g. removed levels, h3 turned off)
+    stale_partitions = [
+        p for p in old_partitions
+        if p.split("|")[0] == country and p not in updated_partitions
+    ]
+    for partition in stale_partitions:
+        context.instance.delete_dynamic_partition("dynamic_country_layers", partition)
+    if stale_partitions:
+        logger.info(f"removed stale partitions for {country}: {stale_partitions}")
+
     return dg.MaterializeResult(
         value=updated_partitions, metadata={"partitions": updated_partitions}
     )
@@ -53,8 +63,9 @@ def country_layers_bkg(context, config, s3, country, out_dir):
 
         updated_partitions.append(f"{country}|{level_val}")
 
-    create_h3_layer(country, f"{DATA_DIR}/DEU/DEU_vg2500_sta.gpkg", out_dir)
-    updated_partitions.append(f"{country}|h3")
+    if config.create_h3:
+        create_h3_layer(country, f"{DATA_DIR}/DEU/DEU_vg2500_sta.gpkg", out_dir)
+        updated_partitions.append(f"{country}|h3")
 
     context.instance.add_dynamic_partitions(
         "dynamic_country_layers", updated_partitions
@@ -68,14 +79,15 @@ def country_layers_osm(context, config, country, out_dir):
 
     download_osm_subnational_boundary(country, gdf_adm0)
 
-    create_h3_layer(country, adm0_boundary_path, out_dir)
-    logger.info(f"generated h3 layer for {country}")
-
     updated_partitions = [
         f"{country}|adm0",
         f"{country}|adm1",
-        f"{country}|h3",
     ]
+
+    if config.create_h3:
+        create_h3_layer(country, adm0_boundary_path, out_dir)
+        logger.info(f"generated h3 layer for {country}")
+        updated_partitions.append(f"{country}|h3")
     context.instance.add_dynamic_partitions(
         "dynamic_country_layers", updated_partitions
     )

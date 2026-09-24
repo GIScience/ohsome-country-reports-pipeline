@@ -41,8 +41,9 @@ def get_hdx_config():
 
 
 class BoundaryConfig(dg.Config):
-    bkg_boundary_levels: [str] = ["vg2500_sta", "vg2500_lan", "vg1000_krs", "vg25_gem"]
+    bkg_boundary_levels: [str] = ["vg2500_sta", "vg2500_lan", "vg1000_krs"]
     geoboundaries_levels: [str] = ["ADM0", "ADM1"]
+    create_h3: bool = True  # False: no h3 layer, no h3 partition, no h3 in the pmtiles
 
 
 class ApiRequestConfig(dg.Config):

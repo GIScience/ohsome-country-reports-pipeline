@@ -20,7 +20,7 @@ def country_boundaries_pmtiles(context: dg.AssetExecutionContext, config: Bounda
     country = context.partition_key
 
     levels = config.bkg_boundary_levels if country == "DEU" else config.geoboundaries_levels
-    layer_names = [level.lower() for level in levels] + ["h3"]
+    layer_names = [level.lower() for level in levels] + (["h3"] if config.create_h3 else [])
 
     layer_gpkg_paths = {}
     for layer in layer_names:
