@@ -56,9 +56,10 @@ duckdb_io_manager = DuckDBPandasIOManager(
     database=f"{DATA_DIR}/asset_output.duckdb"
 )
 
+# EnvVar: resolved at runtime, so the launchpad shows the variable name instead of the secret
 s3_resource = S3Resource(
-    aws_access_key_id=CONFIG.s3_config.key_id,
-    aws_secret_access_key=CONFIG.s3_config.secret,
+    aws_access_key_id=dg.EnvVar("S3_KEY_ID"),
+    aws_secret_access_key=dg.EnvVar("S3_SECRET"),
     endpoint_url=f"https://{CONFIG.s3_config.host}"
 )
 
@@ -71,6 +72,10 @@ def build_table_name(topic, indicator):
 
 
 class CustomDuckDBResource(DuckDBResource):
+    # set in the launchpad (resources.duckdb.config.overwrite) to ignore existing
+    # results and recompute every row; the IO manager then replaces only the
+    # rows of the current partition, the table itself is kept
+    overwrite: bool = False
 
     def query_asset_results_df(self, partition_key, topic, indicator, attribute, attribute_column="attribute", table_name=None):
         table_name = table_name or build_table_name(topic, indicator)
@@ -90,7 +95,11 @@ class CustomDuckDBResource(DuckDBResource):
 
             table_exists = count == 1
 
-            return table_name, table_exists
+        if table_exists and self.overwrite:
+            dg.get_dagster_logger().info(f"overwrite=True, ignoring existing results in {table_name}")
+            table_exists = False
+
+        return table_name, table_exists
 
 
 
