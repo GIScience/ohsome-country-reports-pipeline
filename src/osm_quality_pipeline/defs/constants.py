@@ -64,8 +64,9 @@ OHSOME_QUALITY_API_URL = os.getenv("OHSOME_QUALITY_API_URL", "https://api.heigit
 HEIGIT_API_KEY = os.getenv("HEIGIT_API_KEY", "foo")
 OHSOME_API_URL = os.getenv("OHSOME_API_URL", "https://api.heigit.org/ohsome-api-staging/v2")
 
-OHSOME_QUALITY_API_TIMEOUT = int(os.getenv("OHSOME_QUALITY_API_TIMEOUT", "120"))
-OHSOME_API_TIMEOUT = int(os.getenv("OHSOME_API_TIMEOUT", "180"))
+# `or` fallback: empty values in .env (e.g. `OHSOME_API_TIMEOUT=`) use the default
+OHSOME_QUALITY_API_TIMEOUT = int(os.getenv("OHSOME_QUALITY_API_TIMEOUT") or "120")
+OHSOME_API_TIMEOUT = int(os.getenv("OHSOME_API_TIMEOUT") or "180")
 
 
 def _int_or_none(value):
