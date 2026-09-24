@@ -144,7 +144,7 @@ class OhsomeQualityApiResource(dg.ConfigurableResource):
             except r.HTTPError:
                 row_results = handle_http_error(geom_id, indicator, resp, topic, url, headers, params)
 
-        return row_results
+            return row_results
 
 ohsome_quality_api = OhsomeQualityApiResource()
 
