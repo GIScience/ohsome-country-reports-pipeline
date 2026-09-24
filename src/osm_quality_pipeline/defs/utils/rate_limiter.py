@@ -10,6 +10,14 @@ MINUTE = 60
 DAY = 86400
 
 
+def _format_duration(seconds):
+    minutes = int(seconds // 60)
+    if minutes < 1:
+        return f"{seconds:.0f}s"
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours}h {minutes}m" if hours else f"{minutes}m"
+
+
 def _connect(db_path):
     # isolation_level=None -> autocommit mode, so we control transactions
     # explicitly (needed for BEGIN IMMEDIATE in ApiRateLimiter.acquire()).
@@ -129,13 +137,14 @@ class ApiRateLimiter:
             conn = _connect(self.db_path)
             try:
                 conn.execute("BEGIN IMMEDIATE")
-                wait_for = 0.0
+                minute_wait = 0.0
+                day_wait = 0.0
                 if self.max_per_minute is not None and self._count_since(conn, now - MINUTE) >= self.max_per_minute:
-                    wait_for = max(wait_for, self._oldest_since(conn, now - MINUTE) + MINUTE - now)
+                    minute_wait = self._oldest_since(conn, now - MINUTE) + MINUTE - now
                 if self.max_per_day is not None and self._count_since(conn, now - DAY) >= self.max_per_day:
-                    wait_for = max(wait_for, self._oldest_since(conn, now - DAY) + DAY - now)
+                    day_wait = self._oldest_since(conn, now - DAY) + DAY - now
 
-                if wait_for <= 0:
+                if minute_wait <= 0 and day_wait <= 0:
                     cur = conn.execute("INSERT INTO requests (api_name, ts) VALUES (?, ?)", (self.api_name, now))
                     conn.execute("COMMIT")
                     return cur.lastrowid
@@ -144,9 +153,19 @@ class ApiRateLimiter:
             finally:
                 conn.close()
 
-            sleep_for = min(wait_for, 60) + 0.1
-            logger.info(f"[{self.api_name}] user rate limit reached, sleeping {sleep_for:.0f}s until a slot frees up")
-            time.sleep(sleep_for)
+            # the daily wait can be hours: sleep it in one go and log once
+            if day_wait >= minute_wait:
+                resume_at = datetime.datetime.fromtimestamp(now + day_wait).strftime("%Y-%m-%d %H:%M")
+                logger.warning(
+                    f"[{self.api_name}] daily limit ({self.max_per_day}/day) reached, "
+                    f"sleeping {_format_duration(day_wait)} until {resume_at}"
+                )
+            else:
+                logger.info(
+                    f"[{self.api_name}] per-minute limit ({self.max_per_minute}/minute) reached, "
+                    f"sleeping {minute_wait:.0f}s"
+                )
+            time.sleep(max(minute_wait, day_wait) + 0.1)
 
 
 class ApiQuotaTracker:
