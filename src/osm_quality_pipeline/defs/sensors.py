@@ -24,7 +24,7 @@ FAILED_STATUSES = {
 }
 
 
-def next_state(state, countries, country_layers_partition):
+def next_state(state, countries, all_partitions):
     if state["idx"] < len(countries):
         idx = state["idx"] + 1
         state = {
@@ -34,7 +34,7 @@ def next_state(state, countries, country_layers_partition):
             "finished": False
         }
         prefix = state["iso"]
-        partitions = [p for p in country_layers_partition if p.startswith(prefix)]
+        partitions = [p for p in all_partitions if p.startswith(prefix)]
         state["partitions"] = partitions
     else:
         state["finished"] = True
@@ -44,7 +44,7 @@ def next_state(state, countries, country_layers_partition):
 
 @dg.sensor(
     jobs=[full_workflow],
-    minimum_interval_seconds=15,
+    minimum_interval_seconds=180,
     default_status=dg.DefaultSensorStatus.STOPPED,
     description="Runs the full_workflow_job for every layer of each country."
 )
@@ -64,6 +64,8 @@ def country_sensor(context: dg.SensorEvaluationContext):
     countries = country_config["countries"]
 
 
+    all_partitions = country_layers_partition.get_partition_keys()
+
     ################################################################
     # load state
     ################################################################
@@ -78,7 +80,7 @@ def country_sensor(context: dg.SensorEvaluationContext):
             "finished": False
         }
         prefix = state["iso"]
-        partitions = [p for p in country_layers_partition if p.startswith(prefix)]
+        partitions = [p for p in all_partitions if p.startswith(prefix)]
         state["partitions"] = partitions
         context.log.info(f"initialized state: {state}")
 
@@ -90,18 +92,18 @@ def country_sensor(context: dg.SensorEvaluationContext):
     # check if all runs finished for country
     ################################################################
 
-    statuses = [check_run_status(context, p) for p in state["partitions"]]
-
     if state["finished"]:
         # we are done!
         return dg.SkipReason("We are done with all countries.")
+
+    statuses = [check_run_status(context, p) for p in state["partitions"]]
 
     if any(s in IN_PROGRESS_STATUSES for s in statuses):
         return dg.SkipReason("Some partitions are still running")
 
     if all(s == dg.DagsterRunStatus.SUCCESS for s in statuses):
         context.log.info(f"old state: {state}")
-        state = next_state(state, countries, country_layers_partition)
+        state = next_state(state, countries, all_partitions)
         context.log.info(f"new state: {state}")
 
         if state["finished"]:
@@ -148,7 +150,7 @@ def check_run_status(context, partition):
     )
 
     if len(last_runs) > 0:
-        context.log.info(last_runs[0].status)
+        context.log.info([partition, last_runs[0].status])
         return last_runs[0].status
     else:
         return None
