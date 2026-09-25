@@ -29,7 +29,7 @@ countries:
 - {iso: SDN, h3: false}  # Sudan
 - {iso: SLB, h3: false}  # Solomon Islands
 - {iso: SLE, h3: false}  # Sierra Leone
-- {iso: SOM, h3: false}  # Somalia
+# - {iso: SOM, h3: false}  # Somalia is broken for some reason
 - {iso: SSD, h3: true}  # South Sudan
 - {iso: TLS, h3: false}  # Timor-Leste
 - {iso: TZA, h3: true}  # Tanzania
