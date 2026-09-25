@@ -18,7 +18,6 @@ IN_PROGRESS_STATUSES = [
     dg.DagsterRunStatus.CANCELING,
 ]
 
-
 @dg.sensor(
     jobs=[country_preparation, full_workflow],
     minimum_interval_seconds=15,
@@ -29,19 +28,32 @@ IN_PROGRESS_STATUSES = [
 )
 def country_sensor(context: dg.SensorEvaluationContext):
     context.log.info("Starting country sensor")
+
+
+
+    ################################################################
+    # load general config
+    ################################################################
     country_config = yaml.safe_load(
         files("osm_quality_pipeline.configs").joinpath("sensor_countries.yaml").read_text()
     )
     context.log.info(f"Loaded country config: {country_config}")
-
     overwrite = country_config.get("overwrite", False)
 
+
+    ################################################################
+    # load state
+    ################################################################
     try:
         state = json.loads(context.cursor)
         context.log.info(f"Resuming from cursor: {state}")
     except json.JSONDecodeError:
         state = {"country_idx": 0}
 
+
+    ################################################################
+    # check if past runs finished
+    ################################################################
     runs = context.instance.get_runs(filters=dg.RunsFilter(tags={"country_idx": str(state["country_idx"])}))
     context.log.info(runs)
     run_status = runs[0].status if runs else None
@@ -53,11 +65,11 @@ def country_sensor(context: dg.SensorEvaluationContext):
         return dg.SkipReason(f"Run for country index {state['country_idx']} is still in progress")
 
 
-                            
+    ################################################################
+    # request run for country preparation
+    ################################################################
     country = country_config["countries"][state["country_idx"]]
-
-    context.log.info(f"Processing country: {country}")
-
+    context.log.info(f"Preparation for country: {country}")
     run_config = {
         "ops": {
             "country_layers": {
@@ -72,17 +84,50 @@ def country_sensor(context: dg.SensorEvaluationContext):
             }
         }
     }
-
-    tags = {"country_idx": state["country_idx"]}
-
-    request = dg.RunRequest(
+    tags = {
+        "country_idx": state["country_idx"],
+        "stage": "preparation"
+    }
+    country_preparation_request = dg.RunRequest(
         job_name=country_preparation.name,
         partition_key=country["iso"],
         run_config=run_config,
         tags=tags
     )
 
+
+    ################################################################
+    # request run for country workflow admin 0
+    ################################################################
+    country = country_config["countries"][state["country_idx"]]
+    partition_key = f"{country["iso"]}|adm0"
+    context.log.info(f"Full workflow for country: {country}")
+    run_config = {
+        "resources": {
+            "duckdb": {
+                "config": {
+                    "database": duckdb_resource.database,
+                    "overwrite": overwrite
+                }
+            }
+        }
+    }
+    tags = {
+        "country_idx": state["country_idx"],
+        "stage": "adm0"
+    }
+    country_workflow_request = dg.RunRequest(
+        job_name=full_workflow.name,
+        partition_key=partition_key,
+        run_config=run_config,
+        tags=tags
+    )
+
+
     context.log.info(f"state: {state}")
-    return dg.SensorResult(run_requests=[request], cursor=json.dumps(state))
+    return dg.SensorResult(
+        run_requests=[country_preparation_request, country_workflow_request],
+        cursor=json.dumps(state)
+    )
 
 
