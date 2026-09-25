@@ -10,6 +10,15 @@ from osm_quality_pipeline.defs.partitions import ALL_COUNTRIES
 from osm_quality_pipeline.defs.resources import duckdb_resource
 
 
+IN_PROGRESS_STATUSES = [
+    dg.DagsterRunStatus.QUEUED,
+    dg.DagsterRunStatus.NOT_STARTED,
+    dg.DagsterRunStatus.STARTING,
+    dg.DagsterRunStatus.STARTED,
+    dg.DagsterRunStatus.CANCELING,
+]
+
+
 @dg.sensor(
     jobs=[country_preparation, full_workflow],
     minimum_interval_seconds=15,
@@ -33,13 +42,18 @@ def country_sensor(context: dg.SensorEvaluationContext):
     except json.JSONDecodeError:
         state = {"country_idx": 0}
 
-    runs = context.instance.get_runs(filters=dg.RunsFilter(tags={"country_idx": state["country_idx"]}))
+    runs = context.instance.get_runs(filters=dg.RunsFilter(tags={"country_idx": str(state["country_idx"])}))
     context.log.info(runs)
     run_status = runs[0].status if runs else None
 
     if run_status == dg.DagsterRunStatus.SUCCESS:
         state["country_idx"] += 1
+    elif run_status in IN_PROGRESS_STATUSES:
+        context.log.info(f"Run for country index {state['country_idx']} is still in progress, skipping")
+        return dg.SkipReason(f"Run for country index {state['country_idx']} is still in progress")
 
+
+                            
     country = country_config["countries"][state["country_idx"]]
 
     context.log.info(f"Processing country: {country}")
