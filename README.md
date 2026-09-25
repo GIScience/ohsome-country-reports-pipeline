@@ -42,6 +42,14 @@ dg dev
 ```
 Navigate to localhost:3000 in your browser.
 
+
+### run full workflow
+
+1. run `country_preparation_job`
+2. set pool size for ohsome quality API (see below)
+3. start `country_sensor`
+
+
 ### helpful tip
 
 if you want to limit the amount of assets running at the same time, add the following to the config:
