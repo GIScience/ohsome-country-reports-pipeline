@@ -13,26 +13,26 @@ countries:
 - {iso: CAF, h3: false}  # Central African Republic
 - {iso: COD, h3: false}  # DR Congo
 - {iso: DEU, h3: false}  # Germany
-#- {iso: ETH, h3: false}  # Ethiopia
-#- {iso: GIN, h3: false}  # Guinea
-#- {iso: HTI, h3: false}  # Haiti
-#- {iso: KEN, h3: true}  # Kenya
-#- {iso: LBR, h3: false}  # Liberia
-#- {iso: MDG, h3: false}  # Madagascar
-#- {iso: MMR, h3: false}  # Myanmar
-#- {iso: MOZ, h3: false}  # Mozambique
-#- {iso: MWI, h3: false}  # Malawi
-#- {iso: NGA, h3: false}  # Nigeria
-#- {iso: NPL, h3: false}  # Nepal
-#- {iso: PHL, h3: false}  # Philippines
-#- {iso: PNG, h3: false}  # Papua New Guinea
-#- {iso: SDN, h3: false}  # Sudan
-#- {iso: SLB, h3: false}  # Solomon Islands
-#- {iso: SLE, h3: false}  # Sierra Leone
-#- {iso: SOM, h3: false}  # Somalia
-#- {iso: SSD, h3: true}  # South Sudan
-#- {iso: TLS, h3: false}  # Timor-Leste
-#- {iso: TZA, h3: true}  # Tanzania
-#- {iso: UGA, h3: true}  # Uganda
-#- {iso: VUT, h3: false}  # Vanuatu
-#- {iso: YEM, h3: false}  # Yemen
+- {iso: ETH, h3: false}  # Ethiopia
+- {iso: GIN, h3: false}  # Guinea
+- {iso: HTI, h3: false}  # Haiti
+- {iso: KEN, h3: true}  # Kenya
+- {iso: LBR, h3: false}  # Liberia
+- {iso: MDG, h3: false}  # Madagascar
+- {iso: MMR, h3: false}  # Myanmar
+- {iso: MOZ, h3: false}  # Mozambique
+- {iso: MWI, h3: false}  # Malawi
+- {iso: NGA, h3: false}  # Nigeria
+- {iso: NPL, h3: false}  # Nepal
+- {iso: PHL, h3: false}  # Philippines
+- {iso: PNG, h3: false}  # Papua New Guinea
+- {iso: SDN, h3: false}  # Sudan
+- {iso: SLB, h3: false}  # Solomon Islands
+- {iso: SLE, h3: false}  # Sierra Leone
+- {iso: SOM, h3: false}  # Somalia
+- {iso: SSD, h3: true}  # South Sudan
+- {iso: TLS, h3: false}  # Timor-Leste
+- {iso: TZA, h3: true}  # Tanzania
+- {iso: UGA, h3: true}  # Uganda
+- {iso: VUT, h3: false}  # Vanuatu
+- {iso: YEM, h3: false}  # Yemen
