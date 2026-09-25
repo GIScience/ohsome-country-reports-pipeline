@@ -3,7 +3,7 @@ import os
 import dagster as dg
 
 from osm_quality_pipeline.defs.assets.indicator_results import upload_file_to_s3
-from osm_quality_pipeline.defs.constants import DATA_DIR, BoundaryConfig
+from osm_quality_pipeline.defs.constants import DATA_DIR
 from osm_quality_pipeline.defs.partitions import country_partitions, get_h3_config
 from osm_quality_pipeline.defs.resources import S3Resource
 from osm_quality_pipeline.defs.utils.pmtiles import write_country_boundaries_pmtiles
@@ -16,7 +16,7 @@ logger = dg.get_dagster_logger()
     group_name="preparation",
     deps=["country_layers"],
 )
-def country_pmtiles_s3(context: dg.AssetExecutionContext, config: BoundaryConfig, s3: S3Resource) -> None:
+def country_pmtiles_s3(context: dg.AssetExecutionContext, s3: S3Resource) -> None:
     country = context.partition_key
 
     if country == "DEU":
