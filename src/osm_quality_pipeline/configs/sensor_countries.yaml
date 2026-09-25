@@ -8,31 +8,31 @@ overwrite: false
 # iso: ISO3 code as in countries.yaml
 # h3:  also build and process the h3 hexagon layer
 countries:
-  - {iso: SSD, h3: true}  # South Sudan
-  - {iso: UGA, h3: true}  # Uganda
-  - {iso: TZA, h3: true}  # Tanzania
-  - {iso: KEN, h3: true}  # Kenya
-  - {iso: LBR, h3: false}  # Liberia
-  - {iso: GIN, h3: false}  # Guinea
-  - {iso: MMR, h3: false}  # Myanmar
-  - {iso: MDG, h3: false}  # Madagascar
-  - {iso: PNG, h3: false}  # Papua New Guinea
-  - {iso: TLS, h3: false}  # Timor-Leste
-  - {iso: DEU, h3: false}  # Germany
-  - {iso: COD, h3: false}  # DR Congo
-  - {iso: MOZ, h3: false}  # Mozambique
-  - {iso: MWI, h3: false}  # Malawi
-  - {iso: SLE, h3: false}  # Sierra Leone
-  - {iso: ETH, h3: false}  # Ethiopia
-  - {iso: SOM, h3: false}  # Somalia
-  - {iso: SDN, h3: false}  # Sudan
-  - {iso: CAF, h3: false}  # Central African Republic
-  - {iso: NGA, h3: false}  # Nigeria
-  - {iso: BGD, h3: false}  # Bangladesh
-  - {iso: NPL, h3: false}  # Nepal
-  - {iso: PHL, h3: false}  # Philippines
-  - {iso: AFG, h3: false}  # Afghanistan
-  - {iso: YEM, h3: false}  # Yemen
-  - {iso: HTI, h3: false}  # Haiti
-  - {iso: SLB, h3: false}  # Solomon Islands
-  - {iso: VUT, h3: false}  # Vanuatu
+- {iso: AFG, h3: false}  # Afghanistan
+- {iso: BGD, h3: false}  # Bangladesh
+- {iso: CAF, h3: false}  # Central African Republic
+- {iso: COD, h3: false}  # DR Congo
+- {iso: DEU, h3: false}  # Germany
+- {iso: ETH, h3: false}  # Ethiopia
+- {iso: GIN, h3: false}  # Guinea
+- {iso: HTI, h3: false}  # Haiti
+- {iso: KEN, h3: true}  # Kenya
+- {iso: LBR, h3: false}  # Liberia
+- {iso: MDG, h3: false}  # Madagascar
+- {iso: MMR, h3: false}  # Myanmar
+- {iso: MOZ, h3: false}  # Mozambique
+- {iso: MWI, h3: false}  # Malawi
+- {iso: NGA, h3: false}  # Nigeria
+- {iso: NPL, h3: false}  # Nepal
+- {iso: PHL, h3: false}  # Philippines
+- {iso: PNG, h3: false}  # Papua New Guinea
+- {iso: SDN, h3: false}  # Sudan
+- {iso: SLB, h3: false}  # Solomon Islands
+- {iso: SLE, h3: false}  # Sierra Leone
+- {iso: SOM, h3: false}  # Somalia
+- {iso: SSD, h3: true}  # South Sudan
+- {iso: TLS, h3: false}  # Timor-Leste
+- {iso: TZA, h3: true}  # Tanzania
+- {iso: UGA, h3: true}  # Uganda
+- {iso: VUT, h3: false}  # Vanuatu
+- {iso: YEM, h3: false}  # Yemen
