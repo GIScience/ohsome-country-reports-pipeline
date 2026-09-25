@@ -123,6 +123,10 @@ def country_sensor(context: dg.SensorEvaluationContext):
             context.log.info(f"Retried but still failed partitions: {failed_partitions}.")
             context.log.info(f"Continue with next country.")
 
+            context.log.info(f"old state: {state}")
+            state = next_state(state, countries, all_partitions)
+            context.log.info(f"new state: {state}")
+
 
     ################################################################
     # request runs for country workflow
