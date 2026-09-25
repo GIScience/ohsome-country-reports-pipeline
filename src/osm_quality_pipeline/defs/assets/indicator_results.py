@@ -15,7 +15,7 @@ from osm_quality_pipeline.defs.constants import (
     TOPICS_BY_INDICATOR,
 )
 from osm_quality_pipeline.defs.partitions import (
-    dynamic_country_layers_partition,
+    country_layers_partition,
     get_country_layer_from_partitionkey,
 )
 
@@ -51,7 +51,7 @@ tag_distribution_ins = {
 }
 
 @dg.asset(
-    partitions_def=dynamic_country_layers_partition,
+    partitions_def=country_layers_partition,
     group_name="outputs",
     ins=ins
 )
@@ -76,7 +76,7 @@ def indicator_results_csv_s3(context: dg.AssetExecutionContext, s3: S3Resource, 
 
 
 @dg.asset(
-    partitions_def=dynamic_country_layers_partition,
+    partitions_def=country_layers_partition,
     group_name="outputs",
     ins=ins
 )
@@ -162,7 +162,7 @@ def _normalize_figure(raw, _depth=0):
 
 
 @dg.asset(
-    partitions_def=dynamic_country_layers_partition,
+    partitions_def=country_layers_partition,
     group_name="outputs",
     ins=ins
 )
@@ -210,7 +210,7 @@ def _melt_tag_distribution_df(df: pd.DataFrame, topic: str) -> pd.DataFrame:
 
 
 @dg.asset(
-    partitions_def=dynamic_country_layers_partition,
+    partitions_def=country_layers_partition,
     group_name="outputs",
     ins=tag_distribution_ins
 )

@@ -7,10 +7,9 @@ import geopandas as gpd
 import io
 
 from osm_quality_pipeline.defs.utils.h3 import create_h3_layer
-from osm_quality_pipeline.defs.partitions import country_partitions
+from osm_quality_pipeline.defs.partitions import country_partitions, get_h3_config
 from osm_quality_pipeline.defs.constants import (
     DATA_DIR,
-    BoundaryConfig
 )
 from osm_quality_pipeline.defs.resources import S3Resource
 
@@ -19,80 +18,42 @@ logger = dg.get_dagster_logger()
 
 
 @dg.asset(partitions_def=country_partitions, group_name="preparation")
-def country_layers(context, config: BoundaryConfig, s3: S3Resource) -> dg.MaterializeResult[list[str]]:
+def country_layers(context, s3: S3Resource):
     country = context.partition_key
-
-    old_partitions = context.instance.get_dynamic_partitions("dynamic_country_layers")
-    logger.info(f"existing partitions: {old_partitions}")
 
     out_dir = os.path.join(DATA_DIR, country)
     os.makedirs(out_dir, exist_ok=True)
 
     if country == "DEU":
-        updated_partitions = country_layers_bkg(context, config, s3, country, out_dir)
+        country_layers_bkg(s3, country, out_dir)
     else:
-        updated_partitions = country_layers_osm(context, config, country, out_dir)
+        country_layers_osm(country, out_dir)
 
-    # drop partitions of this country that are no longer produced (e.g. removed levels, h3 turned off)
-    stale_partitions = [
-        p for p in old_partitions
-        if p.split("|")[0] == country and p not in updated_partitions
-    ]
-    for partition in stale_partitions:
-        context.instance.delete_dynamic_partition("dynamic_country_layers", partition)
-    if stale_partitions:
-        logger.info(f"removed stale partitions for {country}: {stale_partitions}")
 
-    return dg.MaterializeResult(
-        value=updated_partitions, metadata={"partitions": updated_partitions}
-    )
-
-def country_layers_bkg(context, config, s3, country, out_dir):
-    logger.info("download BKG boundaries and create partitions for Germany")
-    updated_partitions = []
+def country_layers_bkg(s3, country, out_dir):
+    logger.info("download BKG boundaries for Germany")
 
     s3_client = s3.get_client()
-
-    for level_val in config.bkg_boundary_levels:
+    for level_val in ["vg2500_sta", "vg2500_lan", "vg1000_krs"]:
         logger.info(f"start download: DEU_{level_val}.gpkg")
         s3_client.download_file(
             "heigit-ohsome-quality-api",
             f"bkg_boundaries/DEU_{level_val}.gpkg",
             f"{DATA_DIR}/DEU/DEU_{level_val}.gpkg"
         )
+        logger.info(f"finished download: DEU_{level_val}.gpkg")
 
-        updated_partitions.append(f"{country}|{level_val}")
-
-    if config.create_h3:
+    if get_h3_config(country):
         create_h3_layer(country, f"{DATA_DIR}/DEU/DEU_vg2500_sta.gpkg", out_dir)
-        updated_partitions.append(f"{country}|h3")
-
-    context.instance.add_dynamic_partitions(
-        "dynamic_country_layers", updated_partitions
-    )
-    logger.info(f"added dynamic partitions for {country}: {updated_partitions}")
-    return updated_partitions
 
 
-def country_layers_osm(context, config, country, out_dir):
+def country_layers_osm(country, out_dir):
     adm0_boundary_path, gdf_adm0 = download_osm_boundary_by_iso(country)
 
     download_osm_subnational_boundary(country, gdf_adm0)
 
-    updated_partitions = [
-        f"{country}|adm0",
-        f"{country}|adm1",
-    ]
-
-    if config.create_h3:
+    if get_h3_config(country):
         create_h3_layer(country, adm0_boundary_path, out_dir)
-        logger.info(f"generated h3 layer for {country}")
-        updated_partitions.append(f"{country}|h3")
-    context.instance.add_dynamic_partitions(
-        "dynamic_country_layers", updated_partitions
-    )
-    logger.info(f"added dynamic partitions for {country}: {updated_partitions}")
-    return updated_partitions
 
 
 def download_osm_boundary_by_iso(country):
@@ -119,6 +80,7 @@ def download_osm_boundary_by_iso(country):
     logger.info(f"Saved to {adm0_boundary_path}")
 
     return adm0_boundary_path, gdf
+
 
 def download_osm_subnational_boundary(country, gdf_adm0):
     level = "adm1"

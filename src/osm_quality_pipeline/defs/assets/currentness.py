@@ -2,7 +2,7 @@ import dagster as dg
 
 from osm_quality_pipeline.defs.constants import TOPICS_BY_INDICATOR
 from osm_quality_pipeline.defs.partitions import (
-    dynamic_country_layers_partition,
+    country_layers_partition,
     get_country_layer_from_partitionkey,
 )
 from osm_quality_pipeline.defs.resources import CustomDuckDBResource
@@ -16,7 +16,7 @@ def make_currentness_asset(topic: str):
     topic_ = topic.replace("-", "_")
 
     @dg.asset(
-        partitions_def=dynamic_country_layers_partition,
+        partitions_def=country_layers_partition,
         name=f"{topic_}_currentness",
         group_name=topic_,
         deps=["country_layers"],

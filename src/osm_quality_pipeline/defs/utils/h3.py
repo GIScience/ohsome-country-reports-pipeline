@@ -74,3 +74,4 @@ def create_h3_layer(country, adm0_boundary_path, out_dir):
     grid_clipped, zoom_level = create_h3_gdf(gdf=gdf, country=country)
     output_path = os.path.join(out_dir, f"{country}_h3.gpkg")
     grid_clipped.to_file(output_path, driver="GPKG")
+    logger.info(f"generated h3 layer for {country}")

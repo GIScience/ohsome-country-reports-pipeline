@@ -1,6 +1,6 @@
 import dagster as dg
 
-from osm_quality_pipeline.defs.partitions import country_partitions, dynamic_country_layers_partition
+from osm_quality_pipeline.defs.partitions import country_partitions, country_layers_partition
 
 
 country_preparation = dg.define_asset_job(
@@ -15,6 +15,6 @@ full_workflow = dg.define_asset_job(
     name="full_workflow_job",
     description="Calculate all quality indicators and upload result files to S3 bucket.",
     selection='group:outputs or group:"building_count" or group:"roads" or group:"land_cover" or group:"schools" or group:"hospitals" or group:"buildings"',
-    partitions_def=dynamic_country_layers_partition
+    partitions_def=country_layers_partition
 )
 
