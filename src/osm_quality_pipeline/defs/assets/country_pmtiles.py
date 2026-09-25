@@ -16,14 +16,20 @@ logger = dg.get_dagster_logger()
     group_name="preparation",
     deps=["country_layers"],
 )
-def country_pmtiles(context: dg.AssetExecutionContext, config: BoundaryConfig, s3: S3Resource) -> None:
+def country_pmtiles_s3(context: dg.AssetExecutionContext, config: BoundaryConfig, s3: S3Resource) -> None:
     country = context.partition_key
 
-    levels = config.bkg_boundary_levels if country == "DEU" else config.geoboundaries_levels
-    layer_names = [level.lower() for level in levels] + (["h3"] if get_h3_config(country) else [])
+    if country == "DEU":
+        levels = ["vg2500_sta", "vg2500_lan", "vg1000_krs"]
+    else:
+        levels = ["adm0", "adm1"]
+
+    if get_h3_config(country):
+        levels.append("h3")
+
 
     layer_gpkg_paths = {}
-    for layer in layer_names:
+    for layer in levels:
         gpkg_path = os.path.join(DATA_DIR, country, f"{country}_{layer}.gpkg")
         if os.path.exists(gpkg_path):
             layer_gpkg_paths[layer] = gpkg_path
@@ -33,7 +39,16 @@ def country_pmtiles(context: dg.AssetExecutionContext, config: BoundaryConfig, s
     if not layer_gpkg_paths:
         raise dg.Failure(description=f"No boundary layer files found for {country}.")
 
-    pmtiles_path = os.path.join(DATA_DIR, country, f"{country}_boundaries.pmtiles")
-    write_country_boundaries_pmtiles(layer_gpkg_paths, pmtiles_path)
 
-    upload_file_to_s3(pmtiles_path, country, s3)
+    pmtiles_path = os.path.join(DATA_DIR, country, f"{country}_boundaries.pmtiles")
+
+    write_country_boundaries_pmtiles(
+        layer_gpkg_paths,
+        pmtiles_path
+    )
+
+    upload_file_to_s3(
+        pmtiles_path,
+        country,
+        s3
+    )

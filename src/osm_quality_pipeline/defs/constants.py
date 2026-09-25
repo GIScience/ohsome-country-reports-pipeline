@@ -40,17 +40,6 @@ def get_hdx_config():
     return hdx_config
 
 
-class BoundaryConfig(dg.Config):
-    bkg_boundary_levels: [str] = ["vg2500_sta", "vg2500_lan", "vg1000_krs"]
-    geoboundaries_levels: [str] = ["ADM0", "ADM1"]
-    create_h3: bool = True  # False: no h3 layer, no h3 partition, no h3 in the pmtiles
-
-
-class ApiRequestConfig(dg.Config):
-    max_workers: int = 5
-    handle_500_as_na: bool = False
-
-
 class Config(BaseSettings):
     s3_config: S3Config = S3Config()
 

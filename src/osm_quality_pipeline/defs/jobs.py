@@ -6,7 +6,7 @@ from osm_quality_pipeline.defs.partitions import country_partitions, country_lay
 country_preparation = dg.define_asset_job(
     name="country_preparation_job",
     description="Downloads country boundaries and builds the boundaries pmtiles.",
-    selection='key:"country_layers" or key:"country_boundaries_pmtiles"',
+    selection='key:"country_layers" or key:"country_pmtiles_s3"',
     partitions_def=country_partitions
 )
 
