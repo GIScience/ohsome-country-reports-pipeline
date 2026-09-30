@@ -58,6 +58,25 @@ def geojson_to_multilayer_pmtiles(layers: dict, pmtiles_path: str, minzoom: int 
         raise
 
 
+def check_name_columns(gdf: gpd.GeoDataFrame, layer_name: str):
+    """Warn if admin unit names are missing. tippecanoe drops null properties,
+    so features without a value have no name in the tiles at all."""
+    if "osm_id" in gdf.columns:
+        name_cols = ["name", "name_en", "name_de"]
+    elif layer_name.startswith("vg"):
+        name_cols = ["name"]
+    else:
+        return
+
+    for col in name_cols:
+        if col not in gdf.columns:
+            logger.warning(f"Layer '{layer_name}': name column '{col}' is missing")
+            continue
+        n_missing = gdf[col].isna().sum()
+        if n_missing > 0:
+            logger.warning(f"Layer '{layer_name}': {n_missing}/{len(gdf)} features have no '{col}'")
+
+
 def write_country_boundaries_pmtiles(layer_gpkg_paths: dict, pmtiles_path: str):
     """layer_gpkg_paths: {layer_name: path_to_gpkg}. Reprojects to EPSG:4326 and fixes
     invalid geometries before handing each layer to tippecanoe as a temp GeoJSON."""
@@ -71,6 +90,10 @@ def write_country_boundaries_pmtiles(layer_gpkg_paths: dict, pmtiles_path: str):
             if gdf.crs and gdf.crs.to_epsg() != 4326:
                 gdf = gdf.to_crs(4326)
             gdf["geometry"] = gdf.geometry.buffer(0)
+            if layer_name.startswith("vg"):
+                # BKG: GEN in vg2500, GeografischerName_GEN in vg1000; rename to match the OSM `name` field
+                gdf = gdf.rename(columns={"GEN": "name", "GeografischerName_GEN": "name"})
+            check_name_columns(gdf, layer_name)
 
             geojson_path = os.path.join(tmp_dir, f"{layer_name}.geojson")
             gdf.to_file(geojson_path, driver="GeoJSON")
