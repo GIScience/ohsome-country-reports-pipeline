@@ -1,5 +1,5 @@
 import dagster as dg
-from osm_quality_pipeline.defs.constants import get_hdx_config
+from osm_quality_pipeline.defs.constants import HDX_PRIVATE, get_hdx_config
 from hdx.data.dataset import Dataset
 from hdx.data.hdxobject import HDXError
 from hdx.location.country import Country
@@ -26,7 +26,7 @@ def create_country_dataset(country_code: str, country_name: str, links, context)
     dataset["title"] = title
     dataset["owner_org"] = "heidelberg-institute-for-geoinformation-technology"
     dataset["groups"] = [{"name": "heidelberg-institute-for-geoinformation-technology"}]
-    dataset["private"] = True  # final wieder ändern wenn alles online gehen darf
+    dataset["private"] = HDX_PRIVATE
     dataset.set_expected_update_frequency("Every six months")
     dataset["license_id"] = "cc-by-sa"
     dataset["dataset_source"] = "HeiGIT"

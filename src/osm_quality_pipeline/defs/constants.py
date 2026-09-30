@@ -40,6 +40,10 @@ def get_hdx_config():
     return hdx_config
 
 
+# only an explicit "false" publishes the HDX datasets, anything else keeps them private
+HDX_PRIVATE = os.getenv("HDX_PRIVATE", "true").strip().lower() != "false"
+
+
 class Config(BaseSettings):
     s3_config: S3Config = S3Config()
 
