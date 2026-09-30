@@ -24,6 +24,44 @@ FAILED_STATUSES = {
 }
 
 
+def check_run_status(context, partition):
+    last_runs = context.instance.get_runs(
+        filters=dg.RunsFilter(
+            tags={
+                "dagster/partition": partition
+            },
+        ),
+        limit=1
+    )
+
+    if len(last_runs) > 0:
+        context.log.info([partition, last_runs[0].status])
+        return last_runs[0].status
+    else:
+        return None
+
+def create_run_request(country, overwrite, partition_key):
+    run_config = {
+        "resources": {
+            "duckdb": {
+                "config": {
+                    "database": duckdb_resource.database,
+                    "overwrite": overwrite
+                }
+            }
+        }
+    }
+    tags = {
+        "iso": country,
+    }
+    country_workflow_request = dg.RunRequest(
+        job_name=full_workflow.name,
+        partition_key=partition_key,
+        run_config=run_config,
+        tags=tags
+    )
+    return country_workflow_request
+
 def next_state(state, countries, all_partitions):
     if state["idx"] < len(countries):
         idx = state["idx"] + 1
@@ -142,43 +180,5 @@ def country_sensor(context: dg.SensorEvaluationContext):
         cursor=json.dumps(state)
     )
 
-
-def check_run_status(context, partition):
-    last_runs = context.instance.get_runs(
-        filters=dg.RunsFilter(
-            tags={
-                "dagster/partition": partition
-            },
-        ),
-        limit=1
-    )
-
-    if len(last_runs) > 0:
-        context.log.info([partition, last_runs[0].status])
-        return last_runs[0].status
-    else:
-        return None
-
-def create_run_request(country, overwrite, partition_key):
-    run_config = {
-        "resources": {
-            "duckdb": {
-                "config": {
-                    "database": duckdb_resource.database,
-                    "overwrite": overwrite
-                }
-            }
-        }
-    }
-    tags = {
-        "iso": country,
-    }
-    country_workflow_request = dg.RunRequest(
-        job_name=full_workflow.name,
-        partition_key=partition_key,
-        run_config=run_config,
-        tags=tags
-    )
-    return country_workflow_request
 
 
