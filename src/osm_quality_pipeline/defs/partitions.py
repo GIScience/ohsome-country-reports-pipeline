@@ -62,3 +62,9 @@ def get_country_layers_partitions():
 country_partitions = dg.StaticPartitionsDefinition(partition_keys=get_iso_codes())
 
 country_layers_partition = dg.StaticPartitionsDefinition(partition_keys=get_country_layers_partitions())
+
+# maps every <country>|<layer> partition to its <country> partition, so a per-country
+# asset can depend on all layers of that country
+layers_to_country_mapping = dg.StaticPartitionMapping(
+    {p: get_country_layer_from_partitionkey(p).country for p in get_country_layers_partitions()}
+)

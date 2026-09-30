@@ -1,35 +1,18 @@
 import dagster as dg
-import yaml
 from osm_quality_pipeline.defs.constants import get_hdx_config
 from hdx.data.dataset import Dataset
 from hdx.data.hdxobject import HDXError
+from hdx.location.country import Country
 from datetime import datetime, timezone
-import os
+import re
 
 logger = dg.get_dagster_logger()
 
 
-def get_s3_links(config, country, s3):
-    response = s3.get_client().list_objects_v2(
-        Bucket=config.bucket,
-        Prefix=f"{config.prefix}/{country}/",
-    )
-    # links_list = get_s3_links(country)
-    links_list = [
-        (f"https://{config.host}/{config.bucket}/{obj['Key']}", obj["Key"].split("/")[-1],)
-        for obj in response.get("Contents", [])
-        if obj["Key"].lower().endswith((".gpkg", ".csv"))
-    ]
-    logger.info(links_list)
-    return links_list
-
-
 def upload_to_hdx(country_code, links, context):
-    with open("src/osm_quality_pipeline/configs/countries.yaml", "r") as f:
-        countries = yaml.safe_load(f)
-    hdx_country = countries[country_code]["slug"]
-    country_name = hdx_country.replace("-", " ").title()
-    return create_country_dataset(country_code, country_name, links, context), links
+    """links: list of (file_name, url) tuples."""
+    country_name = Country.get_country_name_from_iso3(country_code)
+    return create_country_dataset(country_code, country_name, links, context)
 
 
 def create_country_dataset(country_code: str, country_name: str, links, context):
@@ -38,7 +21,8 @@ def create_country_dataset(country_code: str, country_name: str, links, context)
     title = f"{country_name} - OSM Data quality"
 
     dataset = Dataset()
-    dataset["name"] = dataset_name.lower().replace(" ", "-")
+    # HDX names allow only lowercase alphanumerics, "-" and "_"
+    dataset["name"] = re.sub(r"[^a-z0-9_-]+", "-", dataset_name.lower())
     dataset["title"] = title
     dataset["owner_org"] = "heidelberg-institute-for-geoinformation-technology"
     dataset["groups"] = [{"name": "heidelberg-institute-for-geoinformation-technology"}]
@@ -48,24 +32,50 @@ def create_country_dataset(country_code: str, country_name: str, links, context)
     dataset["dataset_source"] = "HeiGIT"
     dataset["maintainer"] = "valentin-boehmer-8808"
     dataset["maintainer_email"] = "valentin.boehmer@heigit.org"
-    dataset["methodology"] = " Quality analysis of OSM data unsing the ohsome dashboard."
+    dataset["methodology"] = "Quality analysis of OSM data using the ohsome quality API."
     dataset.set_custom_viz(
-        f"https://giscience.github.io/osm-quality-country-reports/#/{country_code}/roads-all-highways"
+        f"https://giscience.github.io/osm-quality-country-reports/#/{country_code}/roads"
     )
+    if country_code == "DEU":
+        units = (
+            "- **vg2500_sta**: country\n"
+            "- **vg2500_lan**: federal states\n"
+            "- **vg1000_krs**: districts\n\n"
+            "The boundaries are taken from the [German Federal Agency for Cartography and Geodesy (BKG)](https://gdz.bkg.bund.de/)."
+        )
+    else:
+        units = (
+            "- **adm0**: country\n"
+            "- **adm1**: first subnational administrative level\n"
+            "- **h3**: H3 hexagons (only for some countries)\n\n"
+            "The boundaries are taken from [OpenStreetMap](https://www.openstreetmap.org/) administrative boundaries."
+        )
     dataset["notes"] = (
         f"This dataset provides insights into the data quality of [OpenStreetMap](https://www.openstreetmap.org/) (OSM) data in {country_name}."
-        f" It has been created using the OSM data quality analysis of [ohsome](https://dashboard.ohsome.org/).\n\n"
-        f" Different indicators are used to asses the data quality depending on the selected topic, for further information regarding the calculation of the quality indicators see the [Github](https://github.com/GIScience/ohsome-quality-api) repository."
-        f" The OSM data quality analysis is available for different topics either as a CSV or as a Geopackage file."
-        f" The quality analysis is available in three units: admin level 0, admin level 1 and hexagons."
-        f" Each zip file contains all three units for the selected topic."
-        f" The unit of analysis is defined by [geoboundaries](https://www.geoboundaries.org/) country borders.\n\n"
-        f"Attributes of the CSV/ Geopackage file:\n\n"
-        f"- **[unit]_id**: Unit of quality analysis.\n\n"
-        f"- **ADM0_name**: Name of the country.\n\n"
-        f"- **ADM0_iso**: ISO3 country code.\n\n"
-        f"- **result_value_[indicator]**: Calculated result of OSM data quality for the respective indicator. Ranges between 0 and 1 for most indicators.\n\n"
-        f" Different indicators are available for each topic. Check out the [Topic Catalog](https://dashboard.ohsome.org/en/) to see which indicators are relevant for which topic.\n\n"
+        f" It has been created with the [ohsome quality API](https://github.com/GIScience/ohsome-quality-api) and covers the topics"
+        f" buildings, roads, schools, hospitals and land cover. The results can also be explored in the"
+        f" [interactive country report](https://giscience.github.io/osm-quality-country-reports/#/{country_code}/roads).\n\n"
+        f"The analysis is available for the following units, each as one GeoPackage and one CSV file"
+        f" (`{country_code}_<unit>_indicator_results`):\n\n"
+        f"{units}\n\n"
+        f"Indicators: currentness, mapping saturation, user activity, attribute completeness"
+        f" and topic specific comparisons with reference data (building comparison, land cover completeness,"
+        f" land cover thematic accuracy, roads thematic accuracy). Not every indicator is available for every topic or country."
+        f" For how the indicators are calculated see the [ohsome quality API](https://github.com/GIScience/ohsome-quality-api) repository.\n\n"
+        f"**GeoPackage**: one layer per topic, one row per unit.\n\n"
+        f"- **id**: ID of the unit.\n"
+        f"- **value_[indicator]**: Result of the indicator. Ranges between 0 and 1 for most indicators.\n"
+        f"- **quality_class_[indicator]**: Quality rating from 1 (low) to 5 (high). Empty if the indicator has no rating.\n"
+        f"- **description_[indicator]**: Text explaining the result.\n"
+        f"- Attribute completeness is given per attribute, e.g. **value_attribute-completeness_name**.\n"
+        f"- If an indicator is not available for this country, value and quality class are 0 and the description starts with \"skipped\".\n\n"
+        f"**CSV**: one row per unit, topic and indicator, without geometry.\n\n"
+        f"- **id**: ID of the unit (matches the GeoPackage).\n"
+        f"- **topic**, **indicator**, **attribute**: What was analysed. The attribute is only set for attribute completeness.\n"
+        f"- **value**, **quality_class**, **description**: As in the GeoPackage.\n"
+        f"- **status_code**: 200 if the indicator was calculated, 0 if it is not available for this country.\n"
+        f"- **osm_timestamp**: Date of the OSM data used.\n"
+        f"- **figure**: Plotly chart of the result as JSON.\n\n"
         f"This dataset is one of many [HeiGIT exports on HDX](https://data.humdata.org/organization/heidelberg-institute-for-geoinformation-technology). See the [HeiGIT](https://heigit.org/) website for more information.\n\n"
         f"We are looking forward to hearing about your use-case! Feel free to reach out to us and tell us about your research at [communications@heigit.org](mailto:communications@heigit.org) – we would be happy to amplify your work.\n\n")
 
@@ -83,12 +93,12 @@ def create_country_dataset(country_code: str, country_name: str, links, context)
 
     for fname, url in links:
         try:
-            if "_gpkg.zip" in fname:
-                fmt = "zipped geopackage"
-            elif "_csv.zip" in fname:
-                fmt = "zipped csv"
+            if fname.endswith(".gpkg"):
+                fmt = "GeoPackage"
+            elif fname.endswith(".csv"):
+                fmt = "CSV"
             else:
-                fmt = "zip"
+                fmt = fname.rsplit(".", 1)[-1]
             resource = {
                 "name": fname,
                 "description": f"{fname} for {country_name}",
