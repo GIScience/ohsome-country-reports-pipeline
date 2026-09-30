@@ -50,9 +50,9 @@ DATA_DIR = Path(os.getenv("DAGSTER_DATA_DIR"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
-OHSOME_QUALITY_API_URL = os.getenv("OHSOME_QUALITY_API_URL", "https://api.heigit.org/ohsome-quality-api-staging/v2")
+OHSOME_QUALITY_API_URL = os.getenv("OHSOME_QUALITY_API_URL", "https://api.heigit.org/ohsome-quality-api/v2")
 HEIGIT_API_KEY = os.getenv("HEIGIT_API_KEY", "foo")
-OHSOME_API_URL = os.getenv("OHSOME_API_URL", "https://api.heigit.org/ohsome-api-staging/v2")
+OHSOME_API_URL = os.getenv("OHSOME_API_URL", "https://api.heigit.org/ohsome-api/v2")
 
 # `or` fallback: empty values in .env (e.g. `OHSOME_API_TIMEOUT=`) use the default
 OHSOME_QUALITY_API_TIMEOUT = int(os.getenv("OHSOME_QUALITY_API_TIMEOUT") or "120")
