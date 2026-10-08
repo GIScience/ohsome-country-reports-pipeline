@@ -62,7 +62,7 @@ def empty_df(gdf, topic, indicator):
     df["topic"] = topic
     df["indicator"] = indicator
     df["status_code"] = 0
-    df["value"] = 0
+    df["value"] = 0.0
     df["description"] = "skipped: indicator not available for this country"
     df["quality_class"] = 0
     df["osm_timestamp"] = ""
