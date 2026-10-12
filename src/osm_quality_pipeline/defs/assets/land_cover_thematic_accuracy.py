@@ -1,5 +1,7 @@
 import dagster as dg
+import pandas as pd
 
+from osm_quality_pipeline.defs.constants import THEMATIC_ACCURACY_ATTRIBUTES
 from osm_quality_pipeline.defs.partitions import country_layers_partition, get_country_layer_from_partitionkey
 from osm_quality_pipeline.defs.resources import CustomDuckDBResource
 from osm_quality_pipeline.defs.utils.ohsome_quality_api import ohsome_quality_api_requests
@@ -31,16 +33,27 @@ def land_cover_thematic_accuracy(context: dg.AssetExecutionContext, duckdb: Cust
     if country != "DEU":
         logger.info(f"Indicator is only available for DEU. Can't process for {country}.")
         df = empty_df(gdf, topic=TOPIC, indicator=INDICATOR)
+        df["attribute"] = pd.Series([None] * len(df), dtype="string", index=df.index)
         is_valid = True
     else:
-        df, is_valid = ohsome_quality_api_requests(
-            duckdb=duckdb,
-            gdf=gdf,
-            topic=TOPIC,
-            indicator=INDICATOR,
-            partition_key=context.partition_key,
-            table_name=context.asset_key.path[-1]
-        )
+        df_list = []
+        is_valid_list = []
+        for attribute in THEMATIC_ACCURACY_ATTRIBUTES[INDICATOR]:
+            df, is_valid = ohsome_quality_api_requests(
+                duckdb=duckdb,
+                gdf=gdf,
+                topic=TOPIC,
+                indicator=INDICATOR,
+                partition_key=context.partition_key,
+                attribute=attribute,
+                table_name=context.asset_key.path[-1]
+            )
+            df["attribute"] = pd.Series([attribute] * len(df), dtype="string", index=df.index)
+            df_list.append(df)
+            is_valid_list.append(is_valid)
+
+        df = pd.concat(df_list)
+        is_valid = all(is_valid_list)
 
     # First, materialize dataframe into DuckDB
     yield dg.MaterializeResult(value=df)

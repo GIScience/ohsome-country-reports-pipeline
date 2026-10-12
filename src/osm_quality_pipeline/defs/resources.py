@@ -80,11 +80,21 @@ class CustomDuckDBResource(DuckDBResource):
     def query_asset_results_df(self, partition_key, topic, indicator, attribute, attribute_column="attribute", table_name=None):
         table_name = table_name or build_table_name(topic, indicator)
         query = f"SELECT * FROM public.{table_name} WHERE partition_key = '{partition_key}'"
-        if attribute:
-            query += f" AND {attribute_column} = '{attribute}'"
         with self.get_connection() as conn:
+            if attribute:
+                query += f" AND {attribute_column} = '{attribute}'"
+            elif self._has_column(conn, table_name, attribute_column):
+                # rows without attribute because no attribute is for all attributes together (e.g. thematic accuracy)
+                query += f" AND {attribute_column} IS NULL"
             df = conn.execute(query).fetchdf()
             return df
+
+    @staticmethod
+    def _has_column(conn, table_name, column):
+        count = conn.execute(
+            f"SELECT COUNT(*) FROM information_schema.columns WHERE table_name = '{table_name}' AND column_name = '{column}'"
+        ).fetchone()[0]
+        return count == 1
 
     def check_if_table_exists(self, topic, indicator, attribute, table_name=None):
         table_name = table_name or build_table_name(topic, indicator)
@@ -130,6 +140,10 @@ class OhsomeQualityApiResource(dg.ConfigurableResource):
 
         if indicator == "attribute-completeness":
             params["attributes"] = [attribute]
+        elif indicator == "roads-thematic-accuracy" and attribute:
+            params["attribute"] = attribute
+        elif indicator == "land-cover-thematic-accuracy" and attribute:
+            params["corineLandCoverClass"] = attribute
 
         max_attempts = 2  # initial try + 1 retry
         for attempt in range(1, max_attempts + 1):

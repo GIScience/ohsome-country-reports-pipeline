@@ -94,6 +94,20 @@ TOPIC_ATTRIBUTES = {
     "hospitals": ["emergency", "name", "opening-hours", "speciality"],
 }
 
+# None: no attribute in the request, the API then evaluates all attributes together
+THEMATIC_ACCURACY_ATTRIBUTES = {
+    "roads-thematic-accuracy": [None, "surface", "oneway", "lanes", "name", "width"],
+    # CORINE Land Cover level 2 classes
+    "land-cover-thematic-accuracy": [
+        None,
+        "11", "12", "13", "14",
+        "21", "22", "23", "24",
+        "31", "32", "33",
+        "41", "42",
+        "51", "52",
+    ],
+}
+
 STATIC_TOPIC_ASSETS = {
     "buildings": ["building_comparison"],
     "land-cover": ["land_cover_completeness", "land_cover_thematic_accuracy"],
