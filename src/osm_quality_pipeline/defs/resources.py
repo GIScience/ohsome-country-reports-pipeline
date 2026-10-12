@@ -124,7 +124,7 @@ class OhsomeQualityApiResource(dg.ConfigurableResource):
     def base_url(self) -> str:
         return OHSOME_QUALITY_API_URL
 
-    def query(self, indicator, topic, attribute, geojson_geometry, geom_id):
+    def query(self, indicator, topic, attribute, geojson_geometry, geom_id, locale=None):
         url = f"{self.base_url}/indicators/{indicator}"
         headers = {
             "Accept": "application/json",
@@ -132,6 +132,8 @@ class OhsomeQualityApiResource(dg.ConfigurableResource):
             "Authorization": HEIGIT_API_KEY,
             'User-Agent': 'ohsome-country-reports-dagster',
         }
+        if locale:
+            headers["Accept-Language"] = locale
 
         params = {
             "topic": topic,

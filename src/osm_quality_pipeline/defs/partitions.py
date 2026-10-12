@@ -11,20 +11,38 @@ class CountryLayer:
     layer: str
 
 
-def get_iso_codes():
+def _load_countries():
     config = yaml.safe_load(
         files("osm_quality_pipeline.configs").joinpath("countries.yaml").read_text()
     )
-    countries = [c["iso"] for c in config["countries"]]
-    return countries
+    return config["countries"]
 
 
-def get_h3_config(iso):
-    config = yaml.safe_load(
-        files("osm_quality_pipeline.configs").joinpath("countries.yaml").read_text()
-    )
-    h3_by_iso = {c["iso"]: c["h3"] for c in config["countries"]}
-    return h3_by_iso[iso]
+def get_country_key(entry):
+    """Report key of a countries.yaml entry, defaults to the iso code."""
+    return entry.get("key", entry["iso"])
+
+
+def get_country_keys():
+    return [get_country_key(c) for c in _load_countries()]
+
+
+def _get_country_entry(key):
+    entries = {get_country_key(c): c for c in _load_countries()}
+    return entries[key]
+
+
+def get_iso(key):
+    return _get_country_entry(key)["iso"]
+
+
+def get_locale(key):
+    """Locale sent to the ohsome quality API (Accept-Language), None for the default (English)."""
+    return _get_country_entry(key).get("locale")
+
+
+def get_h3_config(key):
+    return _get_country_entry(key)["h3"]
 
 
 def get_country_layer_from_partitionkey(country_layer_partitionkey: str) -> CountryLayer:
@@ -44,22 +62,22 @@ def get_country_layer_from_partitionkey(country_layer_partitionkey: str) -> Coun
 
 def get_country_layers_partitions():
     partitions = []
-    for iso in get_iso_codes():
-        if iso == "DEU":
-            partitions.append("DEU|vg2500_sta")
-            partitions.append("DEU|vg2500_lan")
-            partitions.append("DEU|vg1000_krs")
+    for key in get_country_keys():
+        if get_iso(key) == "DEU":
+            partitions.append(f"{key}|vg2500_sta")
+            partitions.append(f"{key}|vg2500_lan")
+            partitions.append(f"{key}|vg1000_krs")
         else:
-            partitions.append(f"{iso}|adm0")
-            partitions.append(f"{iso}|adm1")
+            partitions.append(f"{key}|adm0")
+            partitions.append(f"{key}|adm1")
 
-        if get_h3_config(iso):
-            partitions.append(f"{iso}|h3")
+        if get_h3_config(key):
+            partitions.append(f"{key}|h3")
 
     return partitions
 
 # partition for country preparation job
-country_partitions = dg.StaticPartitionsDefinition(partition_keys=get_iso_codes())
+country_partitions = dg.StaticPartitionsDefinition(partition_keys=get_country_keys())
 
 country_layers_partition = dg.StaticPartitionsDefinition(partition_keys=get_country_layers_partitions())
 

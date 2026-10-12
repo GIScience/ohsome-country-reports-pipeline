@@ -5,6 +5,8 @@ from osm_quality_pipeline.defs.constants import TOPICS_BY_INDICATOR, TOPIC_ATTRI
 from osm_quality_pipeline.defs.partitions import (
     country_layers_partition,
     get_country_layer_from_partitionkey,
+    get_iso,
+    get_locale,
 )
 from osm_quality_pipeline.defs.resources import CustomDuckDBResource, OhsomeApiResource
 from osm_quality_pipeline.defs.utils.ohsome import tag_distribution_requests, extract_yaml_info
@@ -39,6 +41,11 @@ def make_tag_distribution_asset(topic: str):
 
         gdf = load_layer_as_gdf(context, country, layer)
 
+        if get_locale(country):
+            results_partition_key = f"{get_iso(country)}|{layer}"
+        else:
+            results_partition_key = context.partition_key
+
         measures, filter_expr, grouping_keys = extract_yaml_info(topic)
         all_results = []
         is_valid_list = []
@@ -48,7 +55,7 @@ def make_tag_distribution_asset(topic: str):
                 gdf=gdf,
                 ohsome_api_v2=ohsome_api_v2,
                 topic=topic,
-                partition_key=context.partition_key,
+                partition_key=results_partition_key,
                 filter_expr=filter_expr,
                 grouping_key=key,
                 measures=measures
@@ -58,6 +65,7 @@ def make_tag_distribution_asset(topic: str):
             is_valid_list.append(is_valid)
 
         df_merged = pd.concat(all_results, ignore_index=True)
+        df_merged["partition_key"] = context.partition_key
 
         # First, materialize dataframe into DuckDB
         yield dg.MaterializeResult(value=df_merged)

@@ -4,6 +4,8 @@ from osm_quality_pipeline.defs.partitions import (
     country_layers_partition,
     country_partitions,
     get_country_layer_from_partitionkey,
+    get_iso,
+    get_locale,
     layers_to_country_mapping,
 )
 from osm_quality_pipeline.defs.resources import S3Resource
@@ -22,6 +24,10 @@ logger = dg.get_dagster_logger()
 )
 def hdx_country_dataset(context, s3: S3Resource):
     country = context.partition_key
+    if get_locale(country):
+        logger.info(f"{country} is a localized variant, no HDX dataset is created for it.")
+        return None
+
     layers = [
         get_country_layer_from_partitionkey(p).layer
         for p in country_layers_partition.get_partition_keys()
@@ -47,4 +53,4 @@ def hdx_country_dataset(context, s3: S3Resource):
     ]
     logger.info(links)
 
-    return upload_to_hdx(country, links, context)
+    return upload_to_hdx(get_iso(country), links, context)

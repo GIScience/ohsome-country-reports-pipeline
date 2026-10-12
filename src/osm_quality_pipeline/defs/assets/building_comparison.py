@@ -1,6 +1,6 @@
 import dagster as dg
 
-from osm_quality_pipeline.defs.partitions import country_layers_partition, get_country_layer_from_partitionkey
+from osm_quality_pipeline.defs.partitions import country_layers_partition, get_country_layer_from_partitionkey, get_iso
 from osm_quality_pipeline.defs.resources import CustomDuckDBResource
 from osm_quality_pipeline.defs.utils.ohsome_quality_api import ohsome_quality_api_requests
 from osm_quality_pipeline.defs.utils.utils import load_layer_as_gdf, empty_df
@@ -31,7 +31,7 @@ def building_comparison(
 
     gdf = load_layer_as_gdf(context, country, layer)
 
-    if country != "DEU":
+    if get_iso(country) != "DEU":
         logger.info(f"Indicator is only available for DEU. Can't process for {country}.")
         df = empty_df(gdf, topic=TOPIC, indicator=INDICATOR)
         is_valid = True

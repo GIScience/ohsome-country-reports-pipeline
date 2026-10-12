@@ -5,14 +5,19 @@
 # the retry of a failed run only re-queries the failed rows)
 overwrite: false
 
-# iso: ISO3 code as in countries.yaml
-# h3:  also build and process the h3 hexagon layer
+# iso:    ISO3 code as in countries.yaml
+# h3:     also build and process the h3 hexagon layer
+# key:    optional, partition key / S3 folder of the report (default: iso),
+#         needed to process the same country a second time, e.g. in another language
+# locale: optional, language of the ohsome quality API texts (Accept-Language
+#         header, e.g. "de"), default English
 countries:
 - {iso: AFG, h3: false}  # Afghanistan
 - {iso: BGD, h3: false}  # Bangladesh
 - {iso: CAF, h3: false}  # Central African Republic
 - {iso: COD, h3: false}  # DR Congo
 - {iso: DEU, h3: false}  # Germany
+- {key: DEU_DE, iso: DEU, locale: de, h3: false}  # Germany (German)
 - {iso: ETH, h3: false}  # Ethiopia
 - {iso: GIN, h3: false}  # Guinea
 - {iso: HTI, h3: false}  # Haiti

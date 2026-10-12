@@ -4,7 +4,7 @@ import dagster as dg
 
 from osm_quality_pipeline.defs.assets.indicator_results import upload_file_to_s3
 from osm_quality_pipeline.defs.constants import DATA_DIR
-from osm_quality_pipeline.defs.partitions import country_partitions, get_h3_config
+from osm_quality_pipeline.defs.partitions import country_partitions, get_h3_config, get_iso
 from osm_quality_pipeline.defs.resources import S3Resource
 from osm_quality_pipeline.defs.utils.pmtiles import write_country_boundaries_pmtiles
 
@@ -17,14 +17,15 @@ logger = dg.get_dagster_logger()
     deps=["country_layers"],
 )
 def country_pmtiles_s3(context: dg.AssetExecutionContext, s3: S3Resource) -> None:
-    country = context.partition_key
+    key = context.partition_key
+    country = get_iso(key)
 
     if country == "DEU":
         levels = ["vg2500_sta", "vg2500_lan", "vg1000_krs"]
     else:
         levels = ["adm0", "adm1"]
 
-    if get_h3_config(country):
+    if get_h3_config(key):
         levels.append("h3")
 
 
@@ -40,7 +41,7 @@ def country_pmtiles_s3(context: dg.AssetExecutionContext, s3: S3Resource) -> Non
         raise dg.Failure(description=f"No boundary layer files found for {country}.")
 
 
-    pmtiles_path = os.path.join(DATA_DIR, country, f"{country}_boundaries.pmtiles")
+    pmtiles_path = os.path.join(DATA_DIR, key, f"{key}_boundaries.pmtiles")
 
     write_country_boundaries_pmtiles(
         layer_gpkg_paths,
@@ -49,6 +50,6 @@ def country_pmtiles_s3(context: dg.AssetExecutionContext, s3: S3Resource) -> Non
 
     upload_file_to_s3(
         pmtiles_path,
-        country,
+        key,
         s3
     )

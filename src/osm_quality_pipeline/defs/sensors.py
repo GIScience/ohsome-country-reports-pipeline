@@ -7,7 +7,7 @@ import dagster as dg
 
 from osm_quality_pipeline.defs.jobs import full_workflow
 from osm_quality_pipeline.defs.resources import duckdb_resource
-from osm_quality_pipeline.defs.partitions import country_layers_partition
+from osm_quality_pipeline.defs.partitions import country_layers_partition, get_country_key
 
 
 IN_PROGRESS_STATUSES = [
@@ -62,18 +62,20 @@ def create_run_request(country, overwrite, partition_key):
     )
     return country_workflow_request
 
+def get_partitions_of_country(all_partitions, key):
+    return [p for p in all_partitions if p.split("|")[0] == key]
+
+
 def next_state(state, countries, all_partitions):
     if state["idx"] < len(countries):
         idx = state["idx"] + 1
         state = {
             "idx": idx,
-            "iso": countries[idx]["iso"],
+            "iso": get_country_key(countries[idx]),
             "retries": 0,
             "finished": False
         }
-        prefix = state["iso"]
-        partitions = [p for p in all_partitions if p.startswith(prefix)]
-        state["partitions"] = partitions
+        state["partitions"] = get_partitions_of_country(all_partitions, state["iso"])
     else:
         state["finished"] = True
 
@@ -113,13 +115,11 @@ def country_sensor(context: dg.SensorEvaluationContext):
     except:
         state = {
             "idx": 0,
-            "iso": countries[0]["iso"],
+            "iso": get_country_key(countries[0]),
             "retries": 0,
             "finished": False
         }
-        prefix = state["iso"]
-        partitions = [p for p in all_partitions if p.startswith(prefix)]
-        state["partitions"] = partitions
+        state["partitions"] = get_partitions_of_country(all_partitions, state["iso"])
         context.log.info(f"initialized state: {state}")
 
         return dg.SensorResult(

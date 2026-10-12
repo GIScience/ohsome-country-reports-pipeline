@@ -4,6 +4,7 @@ from os.path import exists
 import dagster as dg
 import pandas as pd
 
+from osm_quality_pipeline.defs.partitions import get_country_layer_from_partitionkey, get_locale
 from osm_quality_pipeline.defs.resources import OhsomeQualityApiResource, oqapi_rate_limiter
 
 
@@ -14,10 +15,11 @@ def ohsome_quality_api_requests(duckdb, gdf, topic, partition_key, indicator, at
     logger.info(f"start ohsome quality API queries for: {partition_key}, {topic}, {indicator}, {attribute}")
 
     table_name, table_exists = duckdb.check_if_table_exists(topic, indicator, attribute, table_name=table_name)
+    locale = get_locale(get_country_layer_from_partitionkey(partition_key).country)
 
     if not table_exists:
         logger.info(f"No existing results, querying all {len(gdf)} rows")
-        new_results = query_api_rows(gdf, topic, indicator, attribute)
+        new_results = query_api_rows(gdf, topic, indicator, attribute, locale)
         df = build_dataframe(gdf, indicator, new_results, topic)
     else:
         existing_df = duckdb.query_asset_results_df(partition_key, topic, indicator, attribute, table_name=table_name)
@@ -25,7 +27,7 @@ def ohsome_quality_api_requests(duckdb, gdf, topic, partition_key, indicator, at
 
         if len(existing_df) == 0:
             logger.info(f"No existing results, querying all {len(gdf)} rows")
-            new_results = query_api_rows(gdf, topic, indicator, attribute)
+            new_results = query_api_rows(gdf, topic, indicator, attribute, locale)
             df = build_dataframe(gdf, indicator, new_results, topic)
         elif len(existing_df) == len(gdf) and retry_ids.empty:
             logger.info("All rows already successful, skipping API calls")
@@ -33,7 +35,7 @@ def ohsome_quality_api_requests(duckdb, gdf, topic, partition_key, indicator, at
         else:
             logger.info(f"Rows to query: {len(retry_ids)}, rows skipping: {len(skip_ids)}")
             retry_gdf = gdf[gdf["id"].isin(retry_ids["id"])]
-            new_results = query_api_rows(retry_gdf, topic, indicator, attribute)
+            new_results = query_api_rows(retry_gdf, topic, indicator, attribute, locale)
             df = merge_results(retry_gdf, existing_df, new_results, topic, indicator)
 
     df, is_valid = validate_df(df)
@@ -51,14 +53,14 @@ def get_retry_rows_ids(existing_df):
     return retry_ids, skip_ids
 
 
-def query_api_rows(gdf, topic, indicator, attribute):
+def query_api_rows(gdf, topic, indicator, attribute, locale=None):
     oqapi_rate_limiter.log_remaining(len(gdf))
     new_columns = []
     for i, (_, row) in enumerate(gdf.iterrows()):
         geojson_geometry = get_geojson_geometry(row)
         ohsome_quality_api = OhsomeQualityApiResource()
         row_results = ohsome_quality_api.query(
-            indicator, topic, attribute, geojson_geometry, row["id"]
+            indicator, topic, attribute, geojson_geometry, row["id"], locale
         )
         new_columns.append(row_results)
         logger.info(f"finished: {i + 1}/{len(gdf)}")

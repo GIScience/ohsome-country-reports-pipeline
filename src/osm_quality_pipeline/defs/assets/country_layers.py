@@ -7,7 +7,7 @@ import geopandas as gpd
 import io
 
 from osm_quality_pipeline.defs.utils.h3 import create_h3_layer
-from osm_quality_pipeline.defs.partitions import country_partitions, get_h3_config
+from osm_quality_pipeline.defs.partitions import country_partitions, get_h3_config, get_iso
 from osm_quality_pipeline.defs.constants import (
     DATA_DIR,
 )
@@ -19,18 +19,21 @@ logger = dg.get_dagster_logger()
 
 @dg.asset(partitions_def=country_partitions, group_name="preparation")
 def country_layers(context, s3: S3Resource):
-    country = context.partition_key
+    key = context.partition_key
+    os.makedirs(os.path.join(DATA_DIR, key), exist_ok=True)
+    country = get_iso(key)
 
     out_dir = os.path.join(DATA_DIR, country)
     os.makedirs(out_dir, exist_ok=True)
 
+    h3 = get_h3_config(key)
     if country == "DEU":
-        country_layers_bkg(s3, country, out_dir)
+        country_layers_bkg(s3, country, out_dir, h3)
     else:
-        country_layers_osm(country, out_dir)
+        country_layers_osm(country, out_dir, h3)
 
 
-def country_layers_bkg(s3, country, out_dir):
+def country_layers_bkg(s3, country, out_dir, h3):
     logger.info("download BKG boundaries for Germany")
 
     s3_client = s3.get_client()
@@ -43,16 +46,16 @@ def country_layers_bkg(s3, country, out_dir):
         )
         logger.info(f"finished download: DEU_{level_val}.gpkg")
 
-    if get_h3_config(country):
+    if h3:
         create_h3_layer(country, f"{DATA_DIR}/DEU/DEU_vg2500_sta.gpkg", out_dir)
 
 
-def country_layers_osm(country, out_dir):
+def country_layers_osm(country, out_dir, h3):
     adm0_boundary_path, gdf_adm0 = download_osm_boundary_by_iso(country)
 
     download_osm_subnational_boundary(country, gdf_adm0)
 
-    if get_h3_config(country):
+    if h3:
         create_h3_layer(country, adm0_boundary_path, out_dir)
 
 

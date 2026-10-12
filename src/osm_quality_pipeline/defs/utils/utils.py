@@ -8,6 +8,7 @@ import dagster as dg
 import datetime
 
 from osm_quality_pipeline.defs.constants import DATA_DIR
+from osm_quality_pipeline.defs.partitions import get_iso
 
 
 logger = dg.get_dagster_logger()
@@ -41,7 +42,8 @@ def log_api_response(resp, max_chars=2000):
 
 
 def load_layer_as_gdf(context, country, layer):
-    layer_path = os.path.join(DATA_DIR, country, f"{country}_{layer}.gpkg")
+    iso = get_iso(country)
+    layer_path = os.path.join(DATA_DIR, iso, f"{iso}_{layer}.gpkg")
     gdf = gpd.read_file(layer_path)
 
     # drop all columns, but id and geometry
