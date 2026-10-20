@@ -25,10 +25,10 @@ def _success():
     return resp
 
 
-def _server_error():
+def _server_error(status_code):
     resp = MagicMock()
-    resp.status_code = 500
-    resp.text = "Internal Server Error"
+    resp.status_code = status_code
+    resp.text = "Server Error"
     resp.headers = {}
     resp.raise_for_status.side_effect = requests.HTTPError(response=resp)
     return resp
@@ -73,8 +73,9 @@ def test_request_loop_success(gdf):
     assert row["treemap_count"] is not None
 
 
-def test_request_loop_retries_server_error_once(gdf):
-    # count: 500 then success on retry, area: success
-    df = _run(gdf, [_server_error(), _success(), _success()])
+@pytest.mark.parametrize("status_code", [500, 502])
+def test_request_loop_retries_server_error_once(gdf, status_code):
+    # count: server error then success on retry, area: success
+    df = _run(gdf, [_server_error(status_code), _success(), _success()])
 
     assert df.iloc[0]["status_code"] == 200

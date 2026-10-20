@@ -117,6 +117,8 @@ duckdb_resource = CustomDuckDBResource(
     database=f"{DATA_DIR}/asset_output.duckdb"
 )
 
+RETRY_STATUS_CODES = (500, 502)
+
 
 class OhsomeQualityApiResource(dg.ConfigurableResource):
 
@@ -154,7 +156,7 @@ class OhsomeQualityApiResource(dg.ConfigurableResource):
                 resp = r.post(url, json=params, headers=headers, timeout=OHSOME_QUALITY_API_TIMEOUT)
                 api_quota_tracker.observe("ohsome_quality_api", resp.headers, request_id)
 
-                if resp.status_code == 500 and attempt < max_attempts:
+                if resp.status_code in RETRY_STATUS_CODES and attempt < max_attempts:
                     continue  # retry once
                 elif resp.status_code == 422 and attempt < max_attempts:
                     error_message = resp.json()
@@ -204,7 +206,7 @@ class OhsomeApiResource(dg.ConfigurableResource):
                 resp = r.post(url, json=params, headers=headers, timeout=OHSOME_API_TIMEOUT)
                 api_quota_tracker.observe("ohsome_api", resp.headers, request_id)
 
-                if resp.status_code == 500 and attempt < max_attempts:
+                if resp.status_code in RETRY_STATUS_CODES and attempt < max_attempts:
                     continue  # retry once
 
                 resp.raise_for_status()
