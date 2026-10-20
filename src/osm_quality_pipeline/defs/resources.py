@@ -197,27 +197,33 @@ class OhsomeApiResource(dg.ConfigurableResource):
             "groupBy": {"type": "byTag", "key": grouping_key}
         }
 
-        request_id = ohsome_api_rate_limiter.acquire()
-        try:
-            resp = r.post(url, json=params, headers=headers, timeout=OHSOME_API_TIMEOUT)
-            api_quota_tracker.observe("ohsome_api", resp.headers, request_id)
-            resp.raise_for_status()
+        max_attempts = 2  # initial try + 1 retry
+        for attempt in range(1, max_attempts + 1):
+            request_id = ohsome_api_rate_limiter.acquire()
+            try:
+                resp = r.post(url, json=params, headers=headers, timeout=OHSOME_API_TIMEOUT)
+                api_quota_tracker.observe("ohsome_api", resp.headers, request_id)
 
-            df = pd.read_csv(
-                StringIO(resp.text),
-                delimiter=";",
-                header=3,
-            )
-            df["status_code"] = 200
-            df["description"] = None
-        except r.Timeout:
-            df = handle_stats_timeout_error(url, headers, params)
-        except r.ConnectionError:
-            df = handle_stats_connection_error(url, headers, params)
-        except r.HTTPError:
-            df = handle_stats_http_error(resp, url, headers, params)
+                if resp.status_code == 500 and attempt < max_attempts:
+                    continue  # retry once
 
-        return df
+                resp.raise_for_status()
+
+                df = pd.read_csv(
+                    StringIO(resp.text),
+                    delimiter=";",
+                    header=3,
+                )
+                df["status_code"] = 200
+                df["description"] = None
+            except r.Timeout:
+                df = handle_stats_timeout_error(url, headers, params)
+            except r.ConnectionError:
+                df = handle_stats_connection_error(url, headers, params)
+            except r.HTTPError:
+                df = handle_stats_http_error(resp, url, headers, params)
+
+            return df
 
 ohsome_api = OhsomeApiResource()
 

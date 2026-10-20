@@ -25,14 +25,19 @@ def request_loop(gdf, ohsome_api_v2, filter_expr, grouping_key, measures):
                 grouping_key=grouping_key,
                 measure=measure
             )
-            row_df = row_df.copy()
-            row_df["id"] = row["id"]
-            measure_result = create_treemap(row_df, measure).iloc[0]
+            status_code = row_df["status_code"].iloc[0]
+            description = row_df["description"].iloc[0]
+            statuses.append((status_code, description))
+            combined["timestamp"] = row_df["timestamp"].iloc[0]
 
-            combined["timestamp"] = measure_result["timestamp"]
+            if status_code != 200:
+                combined[f"treemap_{measure}"] = None
+                combined[f"sum_value_{measure}"] = None
+                continue
+
+            measure_result = create_treemap(row_df, measure).iloc[0]
             combined[f"treemap_{measure}"] = measure_result[f"treemap_{measure}"]
             combined[f"sum_value_{measure}"] = measure_result[f"sum_value_{measure}"]
-            statuses.append((measure_result["status_code"], measure_result["description"]))
 
         failed = next((s for s in statuses if s[0] != 200), None)
         combined["status_code"] = failed[0] if failed else 200
