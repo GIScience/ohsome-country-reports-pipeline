@@ -125,7 +125,7 @@ def empty_stats_df(status_code, description):
     return pd.DataFrame([{
         "timestamp": datetime.datetime.now().isoformat(),
         "value": None,
-        "tagvalue": None,
+        "group": None,
         "status_code": status_code,
         "description": description,
     }])
