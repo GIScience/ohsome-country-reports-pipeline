@@ -67,7 +67,7 @@ def empty_df(gdf, topic, indicator):
     df["value"] = 0.0
     df["description"] = "skipped: indicator not available for this country"
     df["quality_class"] = 0
-    df["osm_timestamp"] = ""
+    df["osm_timestamp"] = datetime.datetime.now()
     df["figure"] = "no figure"
     return df
 
